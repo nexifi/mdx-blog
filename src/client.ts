@@ -1,8 +1,24 @@
 import { Article, BlogApiConfig } from "./types";
 import { sanitizeSlug, fetchWithTimeout } from "./utils/security";
 
-/** URL par défaut de l'API ContentMaster */
-const DEFAULT_API_BASE_URL = "https://api-growthos.nexifi.com";
+/**
+ * Resolves the default base URL for the BlogApiClient.
+ *
+ * Priority:
+ * 1. NEXT_PUBLIC_SITE_URL env var (works in both browser and SSR in Next.js)
+ * 2. Empty string → relative URLs (e.g., `/api/blog` resolves to the current origin)
+ *
+ * The external ContentMaster API URL should NEVER be used here.
+ * Client-side code must go through local API routes that proxy to ContentAPIAdapter.
+ */
+function getDefaultBaseUrl(): string {
+  // NEXT_PUBLIC_* env vars are inlined at build time by Next.js (available client + server)
+  if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "");
+  }
+  // Fallback: empty string = relative URLs (works in browser, not in pure SSR without origin)
+  return "";
+}
 
 /**
  * Client API pour charger les articles depuis une API REST
@@ -36,7 +52,7 @@ export class BlogApiClient {
           "This exposes credentials in the client bundle. Use ContentAPIAdapter (server-only) instead.",
       );
     }
-    this.baseUrl = (config.baseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+    this.baseUrl = (config.baseUrl || getDefaultBaseUrl()).replace(/\/+$/, "");
     this.config = {
       headers: config.headers,
       endpoints: {
