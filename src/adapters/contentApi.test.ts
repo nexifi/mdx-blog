@@ -328,7 +328,7 @@ describe("ContentAPIAdapter", () => {
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("test");
-      expect(article).toEqual({ title: "Found", slug: "test" });
+      expect(article).toMatchObject({ title: "Found", slug: "found" });
     });
 
     it("should return null for 404", async () => {
@@ -369,7 +369,7 @@ describe("ContentAPIAdapter", () => {
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("direct");
-      expect(article).toEqual({ title: "Direct", slug: "direct" });
+      expect(article).toMatchObject({ title: "Direct", slug: "direct" });
     });
 
     it("should return null on non-404 error response", async () => {

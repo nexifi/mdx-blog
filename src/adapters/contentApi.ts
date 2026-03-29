@@ -132,12 +132,15 @@ export class ContentAPIAdapter {
         : data.data?.items || data.data || data.articles || [];
 
       // Filtrer uniquement les articles publiés, ready ou approved
-      return articles.filter(
-        (article: Article) =>
-          article.status === "published" ||
-          article.status === "ready" ||
-          article.status === "approved",
-      );
+      // puis transformer au format Article (slug, image, etc.)
+      return articles
+        .filter(
+          (article: any) =>
+            article.status === "published" ||
+            article.status === "ready" ||
+            article.status === "approved",
+        )
+        .map((article: any) => this.transformArticle(article));
     } catch (error) {
       console.error(
         "Error fetching articles from content API:",
@@ -166,7 +169,8 @@ export class ContentAPIAdapter {
       }
 
       const result = await response.json();
-      return result.data || result;
+      const raw = result.data || result;
+      return this.transformArticle(raw);
     } catch (error) {
       console.error(
         "Error fetching article from content API:",
