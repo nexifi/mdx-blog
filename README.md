@@ -1,6 +1,6 @@
 # @nexifi/mdx-blog
 
-[![CI](https://github.com/nexifi/mdx-blog/actions/workflows/ci.yml/badge.svg)](https://github.com/nexifi/mdx-blog/actions/workflows/ci.yml)
+[![CI](https://github.com/nexifi/mdx-blog/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nexifi/mdx-blog/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@nexifi/mdx-blog)](https://www.npmjs.com/package/@nexifi/mdx-blog)
 [![AI-Ready](https://img.shields.io/badge/AI--Ready-AGENTS.md-blue)](./AGENTS.md)
 [![Showcase](https://img.shields.io/badge/Showcase-getmax.io-black)](https://getmax.io)
