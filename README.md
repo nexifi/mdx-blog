@@ -132,7 +132,7 @@ The agent analyzes your project structure (framework, router, styling, conventio
 - **API routes**: `src/app/api/blog/route.ts` + `src/app/api/blog/[slug]/route.ts`
 - **Live blog**: [getmax.io/fr/blog](https://getmax.io/fr/blog)
 
-> getMax is the AI-powered marketing operating system — site, SEO, campaigns, CRM and analytics in a single console. Built by [Nexifi](https://nexifi.com).
+> getMax is the AI-powered marketing operating system — site, SEO, campaigns, CRM and analytics in a single console. Built by [getMax](https://getmax.io).
 
 ---
 
@@ -585,4 +585,4 @@ const rss = generateRSSFeed(articles, {
 
 ## License
 
-MIT © [Nexifi](https://nexifi.com) — Powering [getMax](https://getmax.io)
+MIT © Powering [getMax](https://getmax.io)
