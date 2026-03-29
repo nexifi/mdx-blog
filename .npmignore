@@ -1,0 +1,25 @@
+# Source files
+src/
+tsup.config.ts
+tsup.cli.config.ts
+tsconfig.json
+vitest.config.ts
+
+# Tests
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+
+# Dev configs
+.eslintrc*
+.prettierrc*
+.editorconfig
+.vscode/
+
+# Misc
+*.map
+.DS_Store
+node_modules/
