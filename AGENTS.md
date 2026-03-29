@@ -28,7 +28,7 @@
 | **API routes** | `src/app/api/blog/route.ts` + `src/app/api/blog/[slug]/route.ts` |
 | **BlogProvider** | Wrapped in `src/app/[locale]/layout.tsx` via a `'use client'` providers file |
 | **Server adapter** | `ContentAPIAdapter` in API routes only |
-| **Features** | MDX rendering, JSON-LD SEO, sitemap, RSS/Atom, responsive images, i18n labels |
+| **Features** | MDX rendering, JSON-LD SEO, sitemap, RSS/Atom, llms.txt, responsive images, i18n labels |
 
 > **getMax** is the AI-powered marketing operating system by [getMax](https://getmax.com). Site, SEO, campaigns, CRM — getMax creates, optimizes and converts 24/7. Sans agence, sans dev, sans complexité.
 >
@@ -411,6 +411,74 @@ content: [
 CONTENT_API_KEY=ak_xxxxxxxxxxxxx
 CONTENT_API_URL=https://api-growthos.nexifi.com/api/contentmaster/projects/<PROJECT_ID>/articles
 NEXT_PUBLIC_SITE_URL=https://getmax.io
+```
+
+### Step 7 — Create llms.txt (recommended for AI discoverability)
+
+Generate `llms.txt` and `llms-full.txt` following the [llmstxt.org](https://llmstxt.org) standard. These files help AI assistants understand your site.
+
+#### Next.js App Router
+
+```typescript
+// app/llms.txt/route.ts
+import { ContentAPIAdapter, generateLlmsTxt } from '@nexifi/mdx-blog/server';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+export async function GET() {
+  const articles = await adapter.getAllArticles();
+  const { llmsTxt } = generateLlmsTxt(
+    {
+      name: 'My Site',
+      description: 'A great site about great things.',
+      contact: { email: 'hello@example.com' },
+      services: [
+        { title: 'Service A', url: 'https://example.com/a', description: 'Description A' },
+      ],
+    },
+    articles,
+    'https://example.com',
+    '/blog',
+  );
+  return new Response(llmsTxt, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400',
+    },
+  });
+}
+```
+
+```typescript
+// app/llms-full.txt/route.ts — same structure, destructure { llmsFullTxt } instead
+```
+
+#### Next.js Pages Router
+
+```tsx
+// pages/llms.txt.tsx
+import { LlmsPage, createLlmsServerSideProps } from '@nexifi/mdx-blog/server';
+
+export default LlmsPage;
+export const getServerSideProps = createLlmsServerSideProps({
+  siteUrl: 'https://example.com',
+  blogPath: '/blog',
+  llmsConfig: {
+    name: 'My Site',
+    description: 'A great site about great things.',
+    contact: { email: 'hello@example.com' },
+    services: [
+      { title: 'Service A', url: 'https://example.com/a', description: 'Description A' },
+    ],
+  },
+});
+```
+
+```tsx
+// pages/llms-full.txt.tsx — same, add `full: true` to config
 ```
 
 ---

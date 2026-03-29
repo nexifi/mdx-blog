@@ -2,23 +2,15 @@ import { Article, BlogApiConfig } from "./types";
 import { sanitizeSlug, fetchWithTimeout } from "./utils/security";
 
 /**
- * Resolves the default base URL for the BlogApiClient.
+ * BlogApiClient always uses relative URLs by default (empty string base).
  *
- * Priority:
- * 1. NEXT_PUBLIC_SITE_URL env var (works in both browser and SSR in Next.js)
- * 2. Empty string → relative URLs (e.g., `/api/blog` resolves to the current origin)
+ * This client is designed to call LOCAL API routes (e.g., `/api/blog`) that proxy
+ * to ContentAPIAdapter server-side. It should NEVER call the external ContentMaster
+ * API directly — that would expose the API key and cause CORS errors.
  *
- * The external ContentMaster API URL should NEVER be used here.
- * Client-side code must go through local API routes that proxy to ContentAPIAdapter.
+ * If you need an absolute base URL (e.g., for SSR where relative URLs don't work),
+ * pass `baseUrl` explicitly in the BlogApiConfig.
  */
-function getDefaultBaseUrl(): string {
-  // NEXT_PUBLIC_* env vars are inlined at build time by Next.js (available client + server)
-  if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "");
-  }
-  // Fallback: empty string = relative URLs (works in browser, not in pure SSR without origin)
-  return "";
-}
 
 /**
  * Client API pour charger les articles depuis une API REST
@@ -52,7 +44,7 @@ export class BlogApiClient {
           "This exposes credentials in the client bundle. Use ContentAPIAdapter (server-only) instead.",
       );
     }
-    this.baseUrl = (config.baseUrl || getDefaultBaseUrl()).replace(/\/+$/, "");
+    this.baseUrl = (config.baseUrl || "").replace(/\/+$/, "");
     this.config = {
       headers: config.headers,
       endpoints: {
