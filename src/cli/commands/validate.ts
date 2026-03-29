@@ -200,7 +200,24 @@ export async function validateCommand(args: string[]): Promise<void> {
     }
   }
 
-  // 11. Check RSS feed
+  // 11. Check llms.txt
+  if (projectInfo.framework === "nextjs") {
+    if (checkLlmsTxt(cwd, projectInfo)) {
+      log(results, {
+        check: "llms.txt",
+        status: "pass",
+        message: "llms.txt file/route exists",
+      });
+    } else {
+      log(results, {
+        check: "llms.txt",
+        status: "warn",
+        message: "No llms.txt file found (recommended for AI discoverability)",
+      });
+    }
+  }
+
+  // 12. Check RSS feed
   if (projectInfo.framework === "nextjs") {
     if (checkRSSFeed(cwd, projectInfo)) {
       log(results, {
@@ -421,6 +438,33 @@ function checkRobots(cwd: string, projectInfo: any): boolean {
       "src/pages/robots.txt.tsx",
       "pages/robots.txt.ts",
       "src/pages/robots.txt.ts",
+    ],
+  };
+
+  const key =
+    projectInfo.framework === "nextjs"
+      ? `nextjs-${projectInfo.router}`
+      : projectInfo.framework;
+
+  const paths = files[key] || [];
+  return paths.some((p) => fs.existsSync(path.join(cwd, p)));
+}
+
+function checkLlmsTxt(cwd: string, projectInfo: any): boolean {
+  const files: Record<string, string[]> = {
+    "nextjs-app": [
+      "app/llms.txt/route.ts",
+      "src/app/llms.txt/route.ts",
+      "app/llms.txt/route.tsx",
+      "src/app/llms.txt/route.tsx",
+      "public/llms.txt",
+    ],
+    "nextjs-pages": [
+      "pages/llms.txt.tsx",
+      "src/pages/llms.txt.tsx",
+      "pages/llms.txt.ts",
+      "src/pages/llms.txt.ts",
+      "public/llms.txt",
     ],
   };
 

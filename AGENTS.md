@@ -475,7 +475,7 @@ import type {
   ChangeFrequency, RSSConfig, AtomConfig,
   StaticSitemapConfig, BuildTimeSEOConfig, LlmsConfig,
   BlogImageProps, ImageSource, ImageLoader, ImageLoaderParams,
-  Labels, SitemapPageConfig, RobotsPageConfig, ContentAPIConfig,
+  Labels, SitemapPageConfig, RobotsPageConfig, LlmsPageConfig, ContentAPIConfig,
 } from '@nexifi/mdx-blog';
 ```
 
@@ -487,12 +487,16 @@ import {
   generateSitemap, buildSitemapXML, generateSitemapIndex,
   getArticleSitemapEntries, generateRobotsTxt,
   generateStaticSitemap, generateSitemapOnBuild, generateBuildTimeSEO,
+  generateLlmsTxt,
   generateRSSFeed, generateAtomFeed,
   sanitizeSlug, fetchWithTimeout, safeJsonLd, escapeXml,
   resolveImageUrl, generateSrcSet, generateSizes,
   computeHeight, buildImageObject, isExternalImage, getExternalOrigin,
   DEFAULT_WIDTHS, ASPECT_RATIOS,
   ArticleMetadataSchema,
+  LlmsPage, createLlmsServerSideProps,
+  SitemapPage, createSitemapServerSideProps,
+  RobotsPage, createRobotsServerSideProps,
 } from '@nexifi/mdx-blog/server';
 ```
 

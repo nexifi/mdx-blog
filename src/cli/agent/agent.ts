@@ -766,6 +766,8 @@ You MUST create ALL of these files:
 - API route (categories): ${srcPrefix}app/api/blog/categories/route.ts (CREATE)
 - Sitemap: ${srcPrefix}app/sitemap.ts (CREATE — dynamic sitemap using ContentAPIAdapter)
 - Robots.txt: ${srcPrefix}app/robots.ts (CREATE — Next.js metadata API)
+- llms.txt: ${srcPrefix}app/llms.txt/route.ts (CREATE — using generateLlmsTxt from @nexifi/mdx-blog/server)
+- llms-full.txt: ${srcPrefix}app/llms-full.txt/route.ts (CREATE — using generateLlmsTxt with full content)
 - RSS Feed: ${srcPrefix}app/feed.xml/route.ts (CREATE — using generateRSSFeed from @nexifi/mdx-blog/server)
 `;
       } else {
@@ -780,6 +782,8 @@ You MUST create ALL of these files:
 - API route (categories): ${srcPrefix}pages/api/blog/categories.ts (CREATE)
 - Sitemap page: ${srcPrefix}pages/sitemap.xml.tsx (CREATE — using SitemapPage + createSitemapServerSideProps)
 - Robots.txt page: ${srcPrefix}pages/robots.txt.tsx (CREATE — using RobotsPage + createRobotsServerSideProps)
+- llms.txt page: ${srcPrefix}pages/llms.txt.tsx (CREATE — using LlmsPage + createLlmsServerSideProps)
+- llms-full.txt page: ${srcPrefix}pages/llms-full.txt.tsx (CREATE — using LlmsPage + createLlmsServerSideProps with full: true)
 - RSS Feed API: ${srcPrefix}pages/api/feed.xml.ts (CREATE — using generateRSSFeed)
 `;
       }
@@ -801,6 +805,7 @@ You MUST create ALL of these files:
 - Sitemap: Use @astrojs/sitemap integration or create src/pages/sitemap.xml.ts
 - RSS Feed: src/pages/feed.xml.ts (CREATE — using generateRSSFeed from @nexifi/mdx-blog/server)
 - Robots.txt: public/robots.txt (CREATE) or src/pages/robots.txt.ts for dynamic
+- llms.txt: src/pages/llms.txt.ts (CREATE — using generateLlmsTxt from @nexifi/mdx-blog/server)
 `;
       break;
     case "nuxt":
@@ -815,6 +820,7 @@ You MUST create ALL of these files:
 - API route (categories): server/api/blog/categories.get.ts (CREATE — use ContentAPIAdapter server-side)
 - Sitemap: Use @nuxtjs/sitemap module or create server/routes/sitemap.xml.get.ts
 - Robots.txt: Use @nuxtjs/robots module or create server/routes/robots.txt.get.ts
+- llms.txt: server/routes/llms.txt.get.ts (CREATE — using generateLlmsTxt from @nexifi/mdx-blog/server)
 - RSS Feed: server/routes/feed.xml.get.ts (CREATE — using generateRSSFeed from @nexifi/mdx-blog/server)
 - Environment: Add CONTENT_API_KEY and CONTENT_API_URL to nuxt.config.ts runtimeConfig
 `;
@@ -833,6 +839,7 @@ You MUST create ALL of these files:
 - API route (categories): src/routes/api/blog/categories/+server.ts (CREATE — proxy to ContentAPIAdapter)
 - Sitemap: src/routes/sitemap.xml/+server.ts (CREATE — generate XML sitemap with ContentAPIAdapter)
 - Robots.txt: static/robots.txt (CREATE) or src/routes/robots.txt/+server.ts for dynamic
+- llms.txt: src/routes/llms.txt/+server.ts (CREATE — using generateLlmsTxt from @nexifi/mdx-blog/server)
 - RSS Feed: src/routes/feed.xml/+server.ts (CREATE — using generateRSSFeed from @nexifi/mdx-blog/server)
 - Environment: Add CONTENT_API_KEY and CONTENT_API_URL to .env and reference via $env/static/private
 `;

@@ -496,8 +496,30 @@ ${urls}
 
 /**
  * Génère les fichiers llms.txt et llms-full.txt
+ *
+ * @example
+ * ```typescript
+ * // App Router: app/llms.txt/route.ts
+ * import { generateLlmsTxt } from '@nexifi/mdx-blog/server';
+ * import { ContentAPIAdapter } from '@nexifi/mdx-blog/server';
+ *
+ * const adapter = new ContentAPIAdapter({ apiKey: process.env.CONTENT_API_KEY! });
+ *
+ * export async function GET() {
+ *   const articles = await adapter.getAllArticles();
+ *   const { llmsTxt } = generateLlmsTxt(
+ *     { name: 'My Site', description: 'A great site' },
+ *     articles,
+ *     'https://example.com',
+ *     '/blog',
+ *   );
+ *   return new Response(llmsTxt, {
+ *     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+ *   });
+ * }
+ * ```
  */
-function generateLlmsTxt(
+export function generateLlmsTxt(
   config: LlmsConfig,
   articles: Article[],
   baseUrl: string,

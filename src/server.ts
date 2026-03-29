@@ -51,6 +51,7 @@ export {
   generateStaticSitemap,
   generateSitemapOnBuild,
   generateBuildTimeSEO,
+  generateLlmsTxt,
 } from "./utils/staticSitemap";
 export type {
   StaticSitemapConfig,
@@ -96,3 +97,11 @@ export {
   getServerSideProps as robotsGetServerSideProps,
 } from "./pages/RobotsPage";
 export type { RobotsPageConfig } from "./pages/RobotsPage";
+
+// LLMs.txt Page (SSR — Pages Router)
+export {
+  default as LlmsPage,
+  createLlmsServerSideProps,
+  getServerSideProps as llmsGetServerSideProps,
+} from "./pages/LlmsPage";
+export type { LlmsPageConfig } from "./pages/LlmsPage";

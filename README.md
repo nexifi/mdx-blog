@@ -398,6 +398,49 @@ await generateBuildTimeSEO({
 });
 ```
 
+### SSR llms.txt (Pages Router)
+
+```tsx
+// pages/llms.txt.tsx
+import { LlmsPage, createLlmsServerSideProps } from '@nexifi/mdx-blog/server';
+
+export default LlmsPage;
+export const getServerSideProps = createLlmsServerSideProps({
+  siteUrl: 'https://getmax.io',
+  blogPath: '/blog',
+  llmsConfig: {
+    name: 'getMax',
+    description: 'AI-powered marketing operating system.',
+    contact: { email: 'hello@getmax.io' },
+    services: [
+      { title: 'SEO', url: 'https://getmax.io/seo', description: 'AI-driven SEO' },
+    ],
+  },
+});
+
+// pages/llms-full.txt.tsx — same but with full: true
+```
+
+### App Router / Remix / Astro — llms.txt
+
+```typescript
+// app/llms.txt/route.ts (Next.js App Router)
+import { generateLlmsTxt, ContentAPIAdapter } from '@nexifi/mdx-blog/server';
+
+const adapter = new ContentAPIAdapter({ apiKey: process.env.CONTENT_API_KEY! });
+
+export async function GET() {
+  const articles = await adapter.getAllArticles();
+  const { llmsTxt } = generateLlmsTxt(
+    { name: 'getMax', description: 'AI-powered marketing OS.' },
+    articles, 'https://getmax.io', '/blog',
+  );
+  return new Response(llmsTxt, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
+  });
+}
+```
+
 ### RSS / Atom Feeds
 
 ```typescript
@@ -508,6 +551,9 @@ const rss = generateRSSFeed(articles, {
 | `generateStaticSitemap(config)` | Build-time sitemap with article fetch |
 | `generateSitemapOnBuild(options)` | Write sitemap.xml to disk |
 | `generateBuildTimeSEO(config)` | Full pipeline: sitemap + robots + llms.txt |
+| `generateLlmsTxt(config, articles, baseUrl, blogPath)` | Generate llms.txt + llms-full.txt content |
+| `LlmsPage` | SSR page component for llms.txt (Pages Router) |
+| `createLlmsServerSideProps(config)` | Factory for llms.txt getServerSideProps |
 | `generateRSSFeed(articles, config)` | RSS 2.0 XML |
 | `generateAtomFeed(articles, config)` | Atom 1.0 XML |
 

@@ -75,9 +75,10 @@ export type {
   LlmsConfig,
 } from "./utils/staticSitemap";
 
-// Sitemap/Robots Pages (SSR, Pages Router) — use "@nexifi/mdx-blog/server"
+// Sitemap/Robots/LLMs Pages (SSR, Pages Router) — use "@nexifi/mdx-blog/server"
 export type { SitemapPageConfig } from "./pages/SitemapPage";
 export type { RobotsPageConfig } from "./pages/RobotsPage";
+export type { LlmsPageConfig } from "./pages/LlmsPage";
 
 // MDX Widgets
 export {

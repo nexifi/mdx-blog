@@ -124,6 +124,7 @@ export async function installCommand(args: string[]): Promise<void> {
     console.log("   • Create blog article page (/blog/[slug])");
     console.log("   • Create sitemap.ts for SEO");
     console.log("   • Create robots.txt");
+    console.log("   • Create llms.txt + llms-full.txt");
     console.log("   • Create RSS feed route (/feed.xml)");
     if (projectInfo.styling === "tailwind") {
       console.log("   • Update Tailwind CSS configuration");
