@@ -6,6 +6,10 @@
   "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "nexifi-blog": "./dist/cli/index.js",
+    "mdx-blog": "./dist/cli/index.js"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
@@ -24,16 +28,22 @@
     "./mdx": {
       "types": "./dist/mdx.d.ts",
       "import": "./dist/mdx.js"
+    },
+    "./cli": {
+      "import": "./dist/cli/index.js"
     }
   },
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
+    "build:cli": "tsup --config tsup.cli.config.ts",
+    "build:all": "pnpm build && pnpm build:cli",
     "dev": "tsup --watch",
     "lint": "eslint src/ --ext .ts,.tsx",
     "test": "vitest",
     "test:ci": "vitest run --coverage",
-    "prepublishOnly": "pnpm test:ci && pnpm build"
+    "prepublishOnly": "pnpm test:ci && pnpm build:all",
+    "blog:validate": "npx @nexifi/mdx-blog validate"
   },
   "keywords": [
     "mdx",
@@ -59,19 +69,23 @@
   ],
   "author": "Nexifi",
   "license": "MIT",
-  "homepage": "https://github.com/nexifi-io/mdx-blog",
+  "homepage": "https://github.com/nexifi/mdx-blog",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nexifi-io/mdx-blog",
+    "url": "https://github.com/nexifi/mdx-blog",
     "directory": "packages/mdx-remote-blog"
   },
   "bugs": {
-    "url": "https://github.com/nexifi-io/mdx-blog/issues"
+    "url": "https://github.com/nexifi/mdx-blog/issues"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@openai/agents": "^0.3.7",
+    "openai": "^5.0.0",
+    "zod": "^3.23.0"
+  },
   "peerDependencies": {
     "@mdx-js/react": ">=2.0.0",
     "next": ">=12.0.0",
@@ -133,6 +147,7 @@
   },
   "files": [
     "dist",
+    "dist/cli",
     "AGENTS.md",
     "README.md",
     "LICENSE",

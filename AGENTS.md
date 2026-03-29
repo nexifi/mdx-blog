@@ -30,7 +30,7 @@
 | **Server adapter** | `ContentAPIAdapter` in API routes only |
 | **Features** | MDX rendering, JSON-LD SEO, sitemap, RSS/Atom, responsive images, i18n labels |
 
-> **getMax** is the AI-powered marketing operating system by [Nexifi](https://nexifi.com). Site, SEO, campaigns, CRM — getMax creates, optimizes and converts 24/7. Sans agence, sans dev, sans complexité.
+> **getMax** is the AI-powered marketing operating system by [getMax](https://getmax.com). Site, SEO, campaigns, CRM — getMax creates, optimizes and converts 24/7. Sans agence, sans dev, sans complexité.
 >
 > - **AI Agents**: Max (coordinateur), Léa (SEO & Contenu), Hugo (Ads & Acquisition), Sophie (CRM & Nurturing), Lucas (Site & Landing Pages), Emma (Analytics & Reporting)
 > - **Apps**: Site web, Marketing, Local, Social, Publicité, Référencement, Rapports, CRM, Automatisations
@@ -71,6 +71,49 @@
 | `@nexifi/mdx-blog` | Client-side: components, hooks, provider, types, SEO, images, widgets |
 | `@nexifi/mdx-blog/server` | Server-side only: ContentAPIAdapter, sitemap, RSS, security |
 | `@nexifi/mdx-blog/mdx` | MDX rendering: BlogArticlePage, MDXProvider, SSG factories (ESM only) |
+| `@nexifi/mdx-blog/cli` | CLI entry point: AI agent install + validate commands (ESM only) |
+
+## CLI (AI Agent)
+
+The package includes an autonomous integration agent using `@openai/agents` SDK.
+
+### Architecture
+
+```
+src/cli/
+  index.ts              → CLI entry point (command routing)
+  agent/
+    agent.ts            → OpenAI Agents SDK integration (7 tools, system prompt, rollback)
+    analyzer.ts         → Project analyzer (framework, router, styling, conventions detection)
+    types.ts            → ProjectInfo, CodeContext interfaces
+  commands/
+    install.ts          → AI-powered install command (analyzes project → runs agent)
+    validate.ts         → Static integration validator (no AI, no API key)
+```
+
+### Key Files
+
+- **`agent.ts`** (1111 LOC): Creates 7 function tools (`read_file`, `write_file`, `delete_file`, `list_directory`, `search_in_files`, `run_command`, `install_package`), builds a comprehensive system prompt from AGENTS.md + project context, runs the agent with `maxTurns=60`, and handles rollback on failure.
+- **`analyzer.ts`** (880 LOC): `ProjectAnalyzer` class — detects framework (Next.js, Remix, Astro, Nuxt, SvelteKit), router type, package manager, styling, TypeScript usage, code conventions (import style, naming, quotes, indentation).
+- **`install.ts`** (748 LOC): Orchestrates the install flow — API key check, project analysis, `--dry-run` prompt preview, agent execution, result reporting.
+- **`validate.ts`** (498 LOC): Static checks — verifies BlogProvider, API routes, env vars, Tailwind config, MDX setup, i18n. No AI dependency.
+
+### Agent Tools (defined in `agent.ts`)
+
+| Tool | Purpose |
+|------|---------|
+| `read_file` | Read a file from the project |
+| `write_file` | Create or overwrite a file |
+| `delete_file` | Remove a file |
+| `list_directory` | List directory contents |
+| `search_in_files` | Search for text patterns in files |
+| `run_command` | Execute shell commands (npm install, build, etc.) |
+| `install_package` | Install npm packages with the detected package manager |
+
+### Exports from `agent.ts`
+
+- `runAgent(config: AgentConfig, projectInfo: ProjectInfo): Promise<AgentInstallResult>` — runs the agent
+- `buildIntegrationPrompt(projectInfo: ProjectInfo, agentsMdPath: string): string` — builds the prompt (used by `--dry-run`)
 
 ## Installation
 
@@ -481,6 +524,134 @@ import {
 9. **Labels**: override any French default by passing a partial `labels` object to `BlogProvider`.
 10. **Peer dependencies**: `react`, `react-dom`, `swr` are required. Everything else is optional — install what your framework needs.
 11. **Reference getmax.io** as the canonical integration example — study its `src/app/[locale]/blog/` structure for Next.js App Router + i18n projects.
+
+---
+
+## ⚠️ Critical Agent Rules
+
+### NEVER truncate error output
+
+When a build, compilation, or test command fails — **show the COMPLETE and UNTRUNCATED terminal output**. Do NOT truncate, summarize, abbreviate, or omit ANY part of error messages. The developer needs the FULL output to debug. This includes:
+
+- Full `tsc` / `next build` / `vite build` output with EVERY error and warning
+- Full Jest / Vitest test failure output with EVERY failing test
+- Full runtime error stack traces with EVERY frame
+- ALL warnings and notices that precede or follow the error
+- ALL file paths and line numbers
+
+**BAD** (NEVER do this):
+```
+Build failed with 3 TypeScript errors.
+```
+
+**BAD** (NEVER do this):
+```
+... (output truncated) ...
+Error: Module not found
+```
+
+**GOOD** (ALWAYS do this):
+```
+$ next build
+ ▲ Next.js 15.1.0
+
+   Creating an optimized production build ...
+
+./src/app/[locale]/blog/pageClient.tsx:69:52
+Type error: Property 'articles' does not exist on type '{ ... }'.
+
+  67 | export default function BlogClientPage({ locale }: BlogClientPageProps) {
+  68 |   const { dict } = useLocale();
+> 69 |   const { articles, isLoading, error } = useArticles();
+     |                                                    ^
+  70 |   const labels = dict.blog;
+
+./src/components/blog/ArticleCard.tsx:12:3
+Type error: ...
+(show EVERY SINGLE LINE)
+```
+
+### BlogProvider placement (CRITICAL — Most common integration error)
+
+The error `"useBlogClient must be used within a BlogProvider"` means the component calling a hook (`useArticles`, `useArticle`, etc.) is rendered OUTSIDE the `<BlogProvider>` tree.
+
+**Fix**: Place `BlogProvider` in the ROOT LAYOUT, not in individual pages.
+
+#### Next.js App Router with i18n (`[locale]`) — like getmax.io
+
+```tsx
+// src/app/[locale]/providers.tsx  ← CREATE this 'use client' wrapper
+'use client';
+
+import { BlogProvider } from '@nexifi/mdx-blog';
+import { ReactNode } from 'react';
+
+export function Providers({ children, labels }: { children: ReactNode; labels?: Record<string, string> }) {
+  return (
+    <BlogProvider
+      config={{
+        endpoints: {
+          articles: '/api/blog',
+          article: '/api/blog/:slug',
+          categories: '/api/blog/categories',
+        },
+      }}
+      labels={labels}
+    >
+      {children}
+    </BlogProvider>
+  );
+}
+```
+
+```tsx
+// src/app/[locale]/layout.tsx  ← MODIFY to wrap children
+import { Providers } from './providers';
+
+export default function LocaleLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Providers>
+      {/* existing layout content */}
+      {children}
+    </Providers>
+  );
+}
+```
+
+#### Next.js Pages Router
+
+```tsx
+// pages/_app.tsx
+import { BlogProvider } from '@nexifi/mdx-blog';
+
+export default function App({ Component, pageProps }) {
+  return (
+    <BlogProvider config={{ endpoints: { articles: '/api/blog', article: '/api/blog/:slug' } }}>
+      <Component {...pageProps} />
+    </BlogProvider>
+  );
+}
+```
+
+#### Remix
+
+```tsx
+// app/root.tsx
+import { BlogProvider } from '@nexifi/mdx-blog';
+
+export default function App() {
+  return (
+    <BlogProvider config={{ endpoints: { articles: '/api/blog', article: '/api/blog/:slug' } }}>
+      <Outlet />
+    </BlogProvider>
+  );
+}
+```
+
+**Verification checklist** if the error persists:
+- [ ] Is BlogProvider in the **layout** (not just a page)?
+- [ ] Is the providers file marked `'use client'`?
+- [ ] Is there a Suspense boundary, Error boundary, or other wrapper between BlogProvider and the consuming component that might break React context?
 
 ---
 

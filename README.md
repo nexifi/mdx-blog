@@ -64,6 +64,44 @@ npm install next-mdx-remote @mdx-js/react remark-gfm rehype-highlight
 
 ---
 
+## CLI — AI-Powered Installation
+
+The package includes an AI agent (powered by [@openai/agents](https://github.com/openai/openai-agents-js)) that can autonomously integrate `@nexifi/mdx-blog` into your project:
+
+```bash
+# Install with AI agent (requires OPENAI_API_KEY)
+npx @nexifi/mdx-blog install
+
+# Dry-run — preview what the agent would do
+npx @nexifi/mdx-blog install --dry-run
+
+# Validate an existing integration
+npx @nexifi/mdx-blog validate
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `install` / `setup` / `init` | Run the AI agent to integrate the blog into your project |
+| `validate` / `check` | Static validation of an existing integration (no API key needed) |
+| `help` | Show available commands |
+| `version` | Show package version |
+
+### Install Options
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview the integration prompt without running the agent |
+| `--verbose` | Show detailed agent activity |
+| `--quiet` | Minimal output |
+| `--model <model>` | OpenAI model to use (default: `gpt-4.1`) |
+| `--keep-on-failure` | Keep changes even if the agent fails (default: rollback) |
+
+The agent analyzes your project structure (framework, router, styling, conventions), reads your AGENTS.md, and generates a complete integration — including provider setup, API routes, blog pages, Tailwind config, and environment variables.
+
+---
+
 ## Supported Frameworks
 
 | Framework | Router | How to use |
