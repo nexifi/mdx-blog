@@ -1,6 +1,6 @@
 {
   "name": "@nexifi/mdx-blog",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Complete headless blog toolkit — API client, React hooks, SEO components, sitemap, RSS, MDX widgets. Works with Next.js, Remix, Astro, Nuxt, SvelteKit, and any React app.",
   "type": "module",
   "main": "dist/index.cjs",
