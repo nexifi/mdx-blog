@@ -44,7 +44,6 @@
     "test:ci": "vitest run --coverage",
     "prepublishOnly": "pnpm test:ci && pnpm build:all",
     "blog:validate": "npx @nexifi/mdx-blog validate",
-    "prepare": "husky",
     "prepare": "husky"
   },
   "keywords": [

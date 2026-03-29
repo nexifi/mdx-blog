@@ -230,6 +230,58 @@ describe("ContentAPIAdapter", () => {
       expect(articles).toHaveLength(1);
     });
 
+    it("should handle API response with data object (no items)", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: [{ title: "Direct data", status: "published" }],
+        }),
+      } as any);
+
+      const adapter = createAdapter();
+      const articles = await adapter.getAllArticles();
+      expect(articles).toHaveLength(1);
+      expect(articles[0].title).toBe("Direct data");
+    });
+
+    it("should handle API response with articles key", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          articles: [{ title: "Via articles key", status: "ready" }],
+        }),
+      } as any);
+
+      const adapter = createAdapter();
+      const articles = await adapter.getAllArticles();
+      expect(articles).toHaveLength(1);
+      expect(articles[0].title).toBe("Via articles key");
+    });
+
+    it("should return empty array when no matching key found", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ something: "else" }),
+      } as any);
+
+      const adapter = createAdapter();
+      const articles = await adapter.getAllArticles();
+      expect(articles).toHaveLength(0);
+    });
+
     it("should throw on non-ok response", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
@@ -302,6 +354,36 @@ describe("ContentAPIAdapter", () => {
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("broken");
+      expect(article).toBeNull();
+    });
+
+    it("should return article directly when no data wrapper", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ title: "Direct", slug: "direct" }),
+      } as any);
+
+      const adapter = createAdapter();
+      const article = await adapter.getArticleBySlug("direct");
+      expect(article).toEqual({ title: "Direct", slug: "direct" });
+    });
+
+    it("should return null on non-404 error response", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+      } as any);
+
+      const adapter = createAdapter();
+      const article = await adapter.getArticleBySlug("server-error");
       expect(article).toBeNull();
     });
   });
