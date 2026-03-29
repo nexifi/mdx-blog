@@ -130,6 +130,7 @@ The agent analyzes your project structure (framework, router, styling, conventio
 - **Features used**: Full blog with MDX rendering, JSON-LD SEO, sitemap, RSS/Atom, `BlogProvider` with French labels, `ContentAPIAdapter` for server-side data fetching, `BlogImage` responsive images
 - **Architecture**: `src/app/[locale]/blog/page.tsx` (list) + `src/app/[locale]/blog/[slug]/page.tsx` (article)
 - **API routes**: `src/app/api/blog/route.ts` + `src/app/api/blog/[slug]/route.ts`
+- **Live blog**: [getmax.io/fr/blog](https://getmax.io/fr/blog)
 
 > getMax is the AI-powered marketing operating system — site, SEO, campaigns, CRM and analytics in a single console. Built by [Nexifi](https://nexifi.com).
 
