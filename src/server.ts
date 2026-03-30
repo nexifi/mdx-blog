@@ -63,6 +63,13 @@ export type {
 export { generateRSSFeed, generateAtomFeed } from "./utils/rss";
 export type { RSSConfig, AtomConfig } from "./utils/rss";
 
+// Markdown → HTML rendering (server-safe, no RSC streaming issues)
+export {
+  renderMarkdown,
+  renderMarkdownSync,
+} from "./utils/markdown";
+export type { RenderMarkdownOptions } from "./utils/markdown";
+
 // Image utilities (pure functions, no React)
 export {
   resolveImageUrl,

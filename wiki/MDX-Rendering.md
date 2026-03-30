@@ -1,8 +1,75 @@
 # MDX Rendering
 
-Components for rendering MDX content with custom styling and interactive widgets.
+Components and utilities for rendering Markdown/MDX content.
 
-## Import
+## Server-Side Rendering with `renderMarkdown` (Recommended)
+
+For **Next.js 15+ App Router**, use `renderMarkdown` from the server entry point. This avoids the RSC streaming errors caused by `next-mdx-remote/rsc`.
+
+> **⚠️ Do NOT use `next-mdx-remote/rsc`** (`<MDXRemote>` or `compileMDX`) in Next.js 15+ App Router — it causes uncatchable errors: `Cannot read properties of undefined (reading 'stack')` and `ReadableStream is already closed`.
+
+### Import
+
+```typescript
+import { renderMarkdown, renderMarkdownSync } from '@nexifi/mdx-blog/server';
+```
+
+### `renderMarkdown(source, options?)` — async
+
+Converts Markdown to HTML. Never throws — returns escaped fallback on error.
+
+```typescript
+const html = await renderMarkdown(article.content || '');
+// → '<h1>Title</h1><p>Content with <strong>bold</strong>...</p>'
+```
+
+### `renderMarkdownSync(source, options?)` — sync
+
+Same as above, synchronous. Useful for build scripts and API routes.
+
+```typescript
+const html = renderMarkdownSync(article.content || '');
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `gfm` | `boolean` | `true` | GitHub Flavored Markdown (tables, strikethrough, etc.) |
+| `breaks` | `boolean` | `false` | Convert single newlines to `<br>` |
+| `markedOptions` | `MarkedOptions` | — | Custom `marked` options (overrides gfm/breaks) |
+
+### Usage in Next.js App Router (Server Component)
+
+```tsx
+// app/blog/[slug]/page.tsx
+import { ContentAPIAdapter, renderMarkdown } from '@nexifi/mdx-blog/server';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await adapter.getArticleBySlug(slug);
+  if (!article) notFound();
+
+  const html = await renderMarkdown(article.content || '');
+
+  return (
+    <div className="prose prose-invert" dangerouslySetInnerHTML={{ __html: html }} />
+  );
+}
+```
+
+---
+
+## MDX Components (Pages Router / Client-side)
+
+For **Next.js Pages Router** or client-side rendering, the MDX entry point provides interactive MDX components.
+
+### Import
 
 ```typescript
 import {

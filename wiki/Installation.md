@@ -15,6 +15,14 @@ npm install @nexifi/mdx-blog react react-dom swr
 | `react-dom` | React DOM renderer (peer dependency) |
 | `swr` | SWR data fetching (peer dependency) |
 
+## Tailwind Typography (Required)
+
+Blog components use Tailwind `prose` classes for article content styling. **Without this plugin, article content renders as unstyled plain text.**
+
+```bash
+npm install @tailwindcss/typography
+```
+
 ## Framework-Specific Dependencies
 
 Install only the dependencies for your framework:
@@ -117,15 +125,16 @@ The API key must match one of these formats:
 
 ## Tailwind CSS Configuration
 
-The package components use Tailwind CSS utility classes. You must include the package in your Tailwind content configuration.
+The package components use Tailwind CSS utility classes. You must include the package in your Tailwind content configuration **and** enable the typography plugin.
 
 ### Tailwind v4 (CSS-based)
 
-Tailwind v4 does **not** use a `tailwind.config.js` file. Add a `@source` directive in your main CSS:
+Tailwind v4 does **not** use a `tailwind.config.js` file. Add `@source` and `@plugin` directives in your main CSS:
 
 ```css
 /* app/globals.css */
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* Include @nexifi/mdx-blog component styles */
 @source "../../node_modules/@nexifi/mdx-blog/dist";
@@ -142,6 +151,9 @@ module.exports = {
   content: [
     './src/**/*.{js,ts,jsx,tsx}',
     './node_modules/@nexifi/mdx-blog/**/*.{js,ts,jsx,tsx}',
+  ],
+  plugins: [
+    require('@tailwindcss/typography'),
   ],
   // ...
 };

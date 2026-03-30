@@ -4,6 +4,34 @@ Common issues and their solutions.
 
 ---
 
+## RSC streaming errors with `next-mdx-remote/rsc` (Next.js 15+)
+
+**Symptoms**:
+```
+TypeError: Cannot read properties of undefined (reading 'stack')
+Error: failed to pipe response
+TypeError: Invalid state: ReadableStream is already closed
+```
+
+**Cause**: `next-mdx-remote/rsc` (`<MDXRemote>` and `compileMDX`) uses React's RSC streaming pipeline. When the MDX content triggers an error during rendering, it escapes the try/catch and corrupts the response stream. This is an incompatibility between `next-mdx-remote/rsc` and Next.js 15+ Turbopack.
+
+**Fix**: Use `renderMarkdown` from `@nexifi/mdx-blog/server` instead:
+
+```tsx
+// Before (broken in Next.js 15+)
+import { MDXRemote } from 'next-mdx-remote/rsc';
+<MDXRemote source={article.content} />
+
+// After (works reliably)
+import { renderMarkdown } from '@nexifi/mdx-blog/server';
+const html = await renderMarkdown(article.content || '');
+<div className="prose prose-invert" dangerouslySetInnerHTML={{ __html: html }} />
+```
+
+See [[MDX Rendering]] for full examples.
+
+---
+
 ## "useBlogClient must be used within a BlogProvider"
 
 **Cause**: A hook (`useArticles`, `useArticle`, etc.) or component (`BlogListPage`, etc.) is rendered outside the `BlogProvider` tree.

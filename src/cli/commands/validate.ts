@@ -164,6 +164,21 @@ export async function validateCommand(args: string[]): Promise<void> {
         message: "Package not in Tailwind content",
       });
     }
+
+    if (checkTypographyPlugin(cwd)) {
+      log(results, {
+        check: "Typography plugin",
+        status: "pass",
+        message: "@tailwindcss/typography configured",
+      });
+    } else {
+      log(results, {
+        check: "Typography plugin",
+        status: "warn",
+        message:
+          "@tailwindcss/typography not found — prose classes won't work (npm install @tailwindcss/typography)",
+      });
+    }
   }
 
   // 9. Check sitemap
@@ -533,6 +548,54 @@ function checkTailwindConfig(cwd: string): boolean {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
       if (content.includes("@nexifi/mdx-blog")) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check that @tailwindcss/typography is configured.
+ * Looks for:
+ * - Tailwind v4: `@plugin "@tailwindcss/typography"` in CSS files
+ * - Tailwind v3: `require('@tailwindcss/typography')` or `@tailwindcss/typography` in config files
+ * - package.json: `@tailwindcss/typography` in dependencies
+ */
+function checkTypographyPlugin(cwd: string): boolean {
+  // Check package.json for the dependency
+  const pkgPath = path.join(cwd, "package.json");
+  if (fs.existsSync(pkgPath)) {
+    const pkg = fs.readFileSync(pkgPath, "utf-8");
+    if (pkg.includes("@tailwindcss/typography")) {
+      return true;
+    }
+  }
+
+  // Check Tailwind v3 config files
+  const configFiles = [
+    "tailwind.config.js",
+    "tailwind.config.ts",
+    "tailwind.config.mjs",
+  ];
+  for (const configFile of configFiles) {
+    const configPath = path.join(cwd, configFile);
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, "utf-8");
+      if (content.includes("@tailwindcss/typography")) {
+        return true;
+      }
+    }
+  }
+
+  // Check Tailwind v4 CSS files for @plugin directive
+  const cssGlobs = ["src/app/globals.css", "src/index.css", "app/globals.css", "styles/globals.css"];
+  for (const cssFile of cssGlobs) {
+    const cssPath = path.join(cwd, cssFile);
+    if (fs.existsSync(cssPath)) {
+      const content = fs.readFileSync(cssPath, "utf-8");
+      if (content.includes("@tailwindcss/typography")) {
         return true;
       }
     }

@@ -282,7 +282,36 @@ export default function Blog() {
 }
 ```
 
-### 4. Article page with SSG (Next.js Pages Router)
+### 4. Article page
+
+#### Next.js App Router (Server Component — recommended)
+
+> **Do NOT use `next-mdx-remote/rsc`** in Next.js 15+ App Router — it causes uncatchable RSC streaming errors. Use `renderMarkdown` instead:
+
+```tsx
+// app/blog/[slug]/page.tsx
+import { ContentAPIAdapter, renderMarkdown } from '@nexifi/mdx-blog/server';
+import { ArticleHead, ArticleSchema, ArticleLayout } from '@nexifi/mdx-blog';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await adapter.getArticleBySlug(slug);
+  if (!article) notFound();
+  const html = await renderMarkdown(article.content || '');
+  return (
+    <ArticleLayout article={article}>
+      <div className="prose prose-invert" dangerouslySetInnerHTML={{ __html: html }} />
+    </ArticleLayout>
+  );
+}
+```
+
+#### Next.js Pages Router (SSG)
 
 ```tsx
 // pages/blog/[slug].tsx
@@ -301,13 +330,23 @@ export default BlogArticlePage;
 
 ### 5. Tailwind CSS
 
+**Required**: Install the typography plugin for `prose` styling of article content:
+```bash
+npm install @tailwindcss/typography
+```
+
 **Tailwind v4** — add to your main CSS:
 ```css
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @source "../../node_modules/@nexifi/mdx-blog/dist";
 ```
 
 **Tailwind v3** — add to `tailwind.config.js`:
 ```js
+plugins: [
+  require('@tailwindcss/typography'),
+],
 content: [
   './node_modules/@nexifi/mdx-blog/**/*.{js,ts,jsx,tsx}',
 ],

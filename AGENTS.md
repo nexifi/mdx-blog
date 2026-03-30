@@ -69,7 +69,7 @@
 | Import | When to use |
 |--------|-------------|
 | `@nexifi/mdx-blog` | Client-side: components, hooks, provider, types, SEO, images, widgets |
-| `@nexifi/mdx-blog/server` | Server-side only: ContentAPIAdapter, sitemap, RSS, security |
+| `@nexifi/mdx-blog/server` | Server-side only: ContentAPIAdapter, sitemap, RSS, security, Markdown rendering |
 | `@nexifi/mdx-blog/mdx` | MDX rendering: BlogArticlePage, MDXProvider, SSG factories (ESM only) |
 | `@nexifi/mdx-blog/cli` | CLI entry point: AI agent install + validate commands (ESM only) |
 
@@ -120,6 +120,9 @@ src/cli/
 ```bash
 # Core (always required)
 npm install @nexifi/mdx-blog react react-dom swr
+
+# Tailwind Typography (required for prose styling of article content):
+npm install @tailwindcss/typography
 
 # Framework-specific (install what you need):
 npm install next                  # Next.js
@@ -362,9 +365,42 @@ export const getStaticProps = createGetStaticProps({
 export default BlogArticlePage;
 ```
 
-#### Next.js App Router / Remix / Astro
+#### Next.js App Router (Server Component — recommended)
 
-For App Router and other frameworks, create a client component that uses the hooks:
+**IMPORTANT**: Do NOT use `next-mdx-remote/rsc` (`<MDXRemote>` or `compileMDX`) in Next.js 15+ App Router — it causes uncatchable RSC streaming errors (`Cannot read properties of undefined (reading 'stack')`, `ReadableStream is already closed`). Use `renderMarkdown` from the server entry point instead:
+
+```tsx
+// app/[locale]/blog/[slug]/page.tsx (Server Component)
+import { ContentAPIAdapter, renderMarkdown } from '@nexifi/mdx-blog/server';
+import { ArticleHead, ArticleSchema, ArticleLayout } from '@nexifi/mdx-blog';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await adapter.getArticleBySlug(slug);
+  if (!article) notFound();
+
+  const html = await renderMarkdown(article.content || '');
+
+  return (
+    <>
+      <ArticleHead article={article} config={{ siteUrl: 'https://example.com', siteName: 'My Site', blogPath: '/blog' }} />
+      <ArticleSchema article={article} config={{ siteUrl: 'https://example.com', siteName: 'My Site', blogPath: '/blog' }} />
+      <ArticleLayout article={article}>
+        <div className="prose prose-invert" dangerouslySetInnerHTML={{ __html: html }} />
+      </ArticleLayout>
+    </>
+  );
+}
+```
+
+#### Client Component alternative (Remix / Astro / etc.)
+
+For client-side rendering with hooks:
 
 ```tsx
 'use client';
@@ -378,8 +414,8 @@ export default function ArticlePage({ slug }: { slug: string }) {
 
   return (
     <>
-      <ArticleHead article={article} config={{ siteUrl: 'https://getmax.io', siteName: 'getMax', blogPath: '/blog' }} />
-      <ArticleSchema article={article} config={{ siteUrl: 'https://getmax.io', siteName: 'getMax', blogPath: '/blog' }} />
+      <ArticleHead article={article} config={{ siteUrl: 'https://example.com', siteName: 'My Site', blogPath: '/blog' }} />
+      <ArticleSchema article={article} config={{ siteUrl: 'https://example.com', siteName: 'My Site', blogPath: '/blog' }} />
       <ArticleLayout article={article}>
         <div dangerouslySetInnerHTML={{ __html: article.content || '' }} />
       </ArticleLayout>
@@ -390,15 +426,26 @@ export default function ArticlePage({ slug }: { slug: string }) {
 
 ### Step 5 — Tailwind CSS configuration
 
+**CRITICAL**: `@tailwindcss/typography` must be installed for `prose` classes to work. Without it, article content will render as unstyled plain text.
+
+```bash
+npm install @tailwindcss/typography
+```
+
 **Tailwind v4** (no `content` array):
 ```css
 /* In your main CSS file (e.g., app/globals.css) */
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @source "../../node_modules/@nexifi/mdx-blog/dist";
 ```
 
 **Tailwind v3**:
 ```js
 // tailwind.config.js
+plugins: [
+  require('@tailwindcss/typography'),
+],
 content: [
   // ... existing paths
   './node_modules/@nexifi/mdx-blog/**/*.{js,ts,jsx,tsx}',
@@ -552,6 +599,7 @@ import type {
 ```typescript
 import {
   ContentAPIAdapter,
+  renderMarkdown, renderMarkdownSync,
   generateSitemap, buildSitemapXML, generateSitemapIndex,
   getArticleSitemapEntries, generateRobotsTxt,
   generateStaticSitemap, generateSitemapOnBuild, generateBuildTimeSEO,
@@ -590,12 +638,13 @@ import {
 3. **API routes proxy to `ContentAPIAdapter`** — client hooks call your local API routes, never the external API directly.
 4. **Match the project's existing code style** — import style (alias vs relative), naming conventions, export patterns.
 5. **Always add the package to Tailwind content paths** if the project uses Tailwind CSS (v3: `content[]`, v4: `@source` directive).
-6. **Use TypeScript** if the project uses TypeScript.
-7. **Handle loading and error states** in pages using the `isLoading` and `error` returned by hooks.
-8. **API key format**: must start with `ak_`, `cm_live_`, or `cm_test_`.
-9. **Labels**: override any French default by passing a partial `labels` object to `BlogProvider`.
-10. **Peer dependencies**: `react`, `react-dom`, `swr` are required. Everything else is optional — install what your framework needs.
-11. **Reference getmax.io** as the canonical integration example — study its `src/app/[locale]/blog/` structure for Next.js App Router + i18n projects.
+6. **Always install `@tailwindcss/typography`** — blog components use `prose` classes. Without this plugin, article content renders as unstyled plain text. For Tailwind v4, add `@plugin "@tailwindcss/typography";` in the CSS. For Tailwind v3, add `require('@tailwindcss/typography')` to the `plugins` array.
+7. **Use TypeScript** if the project uses TypeScript.
+8. **Handle loading and error states** in pages using the `isLoading` and `error` returned by hooks.
+9. **API key format**: must start with `ak_`, `cm_live_`, or `cm_test_`.
+10. **Labels**: override any French default by passing a partial `labels` object to `BlogProvider`.
+11. **Peer dependencies**: `react`, `react-dom`, `swr` are required. Everything else is optional — install what your framework needs.
+12. **Reference getmax.io** as the canonical integration example — study its `src/app/[locale]/blog/` structure for Next.js App Router + i18n projects.
 
 ---
 
@@ -740,10 +789,14 @@ If the project uses i18n with locale-prefixed routes (e.g., `/fr/blog`, `/en/blo
 
 ### Tailwind v4 (no config file)
 
-Tailwind v4 does **not** use a `content` array in `tailwind.config.*`. Add a `@source` directive in the CSS:
+Tailwind v4 does **not** use a `content` array in `tailwind.config.*`. Add a `@source` directive and the typography plugin in the CSS:
 ```css
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @source "../../node_modules/@nexifi/mdx-blog/dist";
 ```
+
+> **Important**: `@tailwindcss/typography` is required for `prose` classes used by blog article content. Install it with `npm install @tailwindcss/typography`.
 
 ### Design System Integration
 

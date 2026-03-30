@@ -5,9 +5,41 @@ Server-only utilities exported from `@nexifi/mdx-blog/server`. These must never 
 ## Import
 
 ```typescript
-import { ContentAPIAdapter } from '@nexifi/mdx-blog/server';
-import type { ContentAPIConfig } from '@nexifi/mdx-blog/server';
+import {
+  ContentAPIAdapter,
+  renderMarkdown,
+  renderMarkdownSync,
+} from '@nexifi/mdx-blog/server';
+import type { ContentAPIConfig, RenderMarkdownOptions } from '@nexifi/mdx-blog/server';
 ```
+
+---
+
+## Markdown Rendering
+
+Server-safe Markdown → HTML conversion using `marked`. Use this instead of `next-mdx-remote/rsc` in Next.js 15+ App Router to avoid RSC streaming errors.
+
+### `renderMarkdown(source, options?)` — async
+
+```typescript
+const html = await renderMarkdown(article.content || '');
+```
+
+Never throws — returns escaped HTML fallback on error.
+
+### `renderMarkdownSync(source, options?)` — sync
+
+```typescript
+const html = renderMarkdownSync(article.content || '');
+```
+
+### Options (`RenderMarkdownOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `gfm` | `boolean` | `true` | GitHub Flavored Markdown |
+| `breaks` | `boolean` | `false` | Convert `\n` to `<br>` |
+| `markedOptions` | `MarkedOptions` | — | Custom `marked` options |
 
 ---
 
