@@ -324,37 +324,44 @@ describe("ContentAPIAdapter", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: { title: "Found" } }),
+        json: async () => ({ data: { title: "Found", content: "<p>Full content</p>" } }),
       } as any);
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("found");
-      expect(article).toMatchObject({ title: "Found", slug: "found" });
+      expect(article).toMatchObject({ title: "Found", slug: "found", content: "<p>Full content</p>" });
     });
 
-    it("should fallback to list when direct lookup slug does not match", async () => {
+    it("should fallback to list then fetch full article by native ID", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // Direct lookup returns an article but its generated slug won't match "my-slug"
+      // 1. Direct lookup returns an article but its generated slug won't match "my-slug"
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ data: { title: "Different Title" } }),
       } as any);
 
-      // Fallback: getAllArticles returns a list with a matching article
+      // 2. Fallback: _getRawArticles returns a list with a matching raw article (with id)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => [
-          { title: "My Slug", status: "published" },
+          { id: "uuid-123", title: "My Slug", status: "published" },
         ],
+      } as any);
+
+      // 3. Fetch full article by native ID
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { id: "uuid-123", title: "My Slug", content: "<p>Full</p>", status: "published" } }),
       } as any);
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("my-slug");
-      expect(article).toMatchObject({ title: "My Slug", slug: "my-slug" });
+      expect(article).toMatchObject({ title: "My Slug", slug: "my-slug", content: "<p>Full</p>" });
     });
 
     it("should return null when article not found anywhere", async () => {
@@ -368,7 +375,7 @@ describe("ContentAPIAdapter", () => {
         statusText: "Not Found",
       } as any);
 
-      // Fallback: getAllArticles returns empty
+      // Fallback: _getRawArticles returns empty
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -386,7 +393,7 @@ describe("ContentAPIAdapter", () => {
 
       // Direct lookup throws
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
-      // Fallback also throws
+      // Fallback _getRawArticles also throws
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       const adapter = createAdapter();
@@ -401,35 +408,45 @@ describe("ContentAPIAdapter", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ title: "Direct" }),
+        json: async () => ({ title: "Direct", content: "Some content" }),
       } as any);
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("direct");
-      expect(article).toMatchObject({ title: "Direct", slug: "direct" });
+      expect(article).toMatchObject({ title: "Direct", slug: "direct", content: "Some content" });
     });
 
-    it("should return null on non-404 error and empty list fallback", async () => {
+    it("should return list version when fetch by ID fails", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // Direct lookup: 500
+      // 1. Direct lookup: 500
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: "Internal Server Error",
       } as any);
 
-      // Fallback: getAllArticles returns empty
+      // 2. Fallback: _getRawArticles returns matching article
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => [],
+        json: async () => [
+          { id: "uuid-456", title: "Server Error", status: "published" },
+        ],
+      } as any);
+
+      // 3. Fetch by ID also fails
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
       } as any);
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("server-error");
-      expect(article).toBeNull();
+      // Falls back to transformed list version (without content)
+      expect(article).toMatchObject({ title: "Server Error", slug: "server-error" });
     });
   });
 

@@ -157,7 +157,8 @@ export class ContentAPIAdapter {
    * Strategy:
    * 1. Try a direct API lookup (works if slug is a UUID / native API id)
    * 2. If that fails (404 or the returned article's generated slug doesn't match),
-   *    fall back to fetching all articles and finding the one whose generated slug matches.
+   *    fall back to fetching all articles, find the one whose generated slug matches,
+   *    then fetch the full article by its native ID to get the content.
    */
   async getArticleBySlug(slug: string): Promise<Article | null> {
     try {
@@ -182,9 +183,33 @@ export class ContentAPIAdapter {
         // Direct lookup failed — fall through to list-based search
       }
 
-      // 2. Fallback: fetch all articles and find by generated slug
-      const allArticles = await this.getAllArticles();
-      return allArticles.find((a) => a.slug === safeSlug) || null;
+      // 2. Fallback: fetch raw articles list to find the native ID
+      const rawArticles = await this._getRawArticles();
+      const rawMatch = rawArticles.find((raw: any) => {
+        const generated = this.transformArticle(raw);
+        return generated.slug === safeSlug;
+      });
+
+      if (!rawMatch || !rawMatch.id) {
+        return null;
+      }
+
+      // 3. Fetch the full article by its native ID to get content
+      try {
+        const response = await this.authenticatedFetch(
+          `${this._articlesUrl.replace(this._baseUrl, "")}/${rawMatch.id}`,
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          const raw = result.data || result;
+          return this.transformArticle(raw);
+        }
+      } catch {
+        // If direct fetch by ID also fails, return the list version (without content)
+      }
+
+      return this.transformArticle(rawMatch);
     } catch (error) {
       console.error(
         "Error fetching article from content API:",
@@ -192,6 +217,32 @@ export class ContentAPIAdapter {
       );
       return null;
     }
+  }
+
+  /**
+   * Fetch raw (untransformed) articles from the API list endpoint.
+   * Used internally to resolve generated slugs back to native IDs.
+   */
+  private async _getRawArticles(): Promise<any[]> {
+    const response = await this.authenticatedFetch(
+      `${this._articlesUrl.replace(this._baseUrl, "")}?limit=100`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch articles: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const articles = Array.isArray(data)
+      ? data
+      : data.data?.items || data.data || data.articles || [];
+
+    return articles.filter(
+      (article: any) =>
+        article.status === "published" ||
+        article.status === "ready" ||
+        article.status === "approved",
+    );
   }
 
   /**
