@@ -151,41 +151,76 @@ export class ContentAPIAdapter {
   }
 
   /**
+   * Checks whether a string looks like a native API identifier (UUID or similar).
+   * Human-readable slugs (generated from titles) won't match.
+   */
+  private static _isNativeId(value: string): boolean {
+    // UUID v4
+    if (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value,
+      )
+    ) {
+      return true;
+    }
+    // CUID (cmmgikzrb00013hnojagdwbos-style)
+    if (/^c[a-z0-9]{24,}$/i.test(value)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Safely consume (drain) a response body to prevent stream leaks.
+   */
+  private static async _drainResponse(response: Response): Promise<void> {
+    try {
+      await response.text();
+    } catch {
+      // Ignore errors — we just need to consume the body
+    }
+  }
+
+  /**
    * Récupère un article spécifique par son slug (généré depuis le titre)
    * ou par son ID natif.
    *
    * Strategy:
-   * 1. Try a direct API lookup (works if slug is a UUID / native API id)
-   * 2. If that fails (404 or the returned article's generated slug doesn't match),
-   *    fall back to fetching all articles, find the one whose generated slug matches,
-   *    then fetch the full article by its native ID to get the content.
+   * - If the slug looks like a native API id (UUID/CUID), try a direct lookup.
+   * - Otherwise, fetch the article list, find the matching raw article by
+   *   generated slug, then fetch the full article by its native ID to get
+   *   the content.
    */
   async getArticleBySlug(slug: string): Promise<Article | null> {
     try {
       const safeSlug = sanitizeSlug(slug);
 
-      // 1. Try direct API lookup (UUID or native identifier)
-      try {
-        const response = await this.authenticatedFetch(
-          `${this._articlesUrl.replace(this._baseUrl, "")}/${safeSlug}`,
-        );
+      // 1. If the slug is a native ID, try direct API lookup first
+      if (ContentAPIAdapter._isNativeId(safeSlug)) {
+        try {
+          const response = await this.authenticatedFetch(
+            `${this._articlesUrl.replace(this._baseUrl, "")}/${safeSlug}`,
+          );
 
-        if (response.ok) {
-          const result = await response.json();
-          const raw = result.data || result;
-          const transformed = this.transformArticle(raw);
-          // Verify the generated slug actually matches what was requested
-          if (transformed.slug === safeSlug) {
-            return transformed;
+          if (response.ok) {
+            const result = await response.json();
+            const raw = result.data || result;
+            return this.transformArticle(raw);
           }
+          // Drain the response body to avoid stream leaks
+          await ContentAPIAdapter._drainResponse(response);
+        } catch {
+          // Direct lookup failed — fall through to list-based search
         }
-      } catch {
-        // Direct lookup failed — fall through to list-based search
       }
 
-      // 2. Fallback: fetch raw articles list to find the native ID
+      // 2. Fetch raw articles list and find the one whose generated slug
+      //    or native ID matches
       const rawArticles = await this._getRawArticles();
       const rawMatch = rawArticles.find((raw: any) => {
+        // Match by native API id (UUID, CUID, etc.)
+        if (raw.id === safeSlug) return true;
+        // Match by generated slug (human-readable)
         const generated = this.transformArticle(raw);
         return generated.slug === safeSlug;
       });
@@ -205,6 +240,7 @@ export class ContentAPIAdapter {
           const raw = result.data || result;
           return this.transformArticle(raw);
         }
+        await ContentAPIAdapter._drainResponse(response);
       } catch {
         // If direct fetch by ID also fails, return the list version (without content)
       }

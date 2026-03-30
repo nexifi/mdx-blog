@@ -21,9 +21,12 @@ beforeEach(() => {
   consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-afterEach(() => {
+afterEach(async () => {
   globalThis.window = originalWindow;
   consoleErrorSpy.mockRestore();
+  // Clear mock call history and queued return values between tests
+  const { fetchWithTimeout } = await import("../utils/security");
+  vi.mocked(fetchWithTimeout).mockReset();
 });
 
 function createAdapter(overrides: Partial<ContentAPIConfig> = {}) {
@@ -316,34 +319,31 @@ describe("ContentAPIAdapter", () => {
   });
 
   describe("getArticleBySlug", () => {
-    it("should return article when direct lookup slug matches", async () => {
+    it("should return article via direct lookup when slug is a UUID", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // Direct lookup returns an article whose generated slug matches "found"
+      const uuid = "d3d436d9-139a-4cf8-a0b6-ab4733b2da70";
+
+      // Direct lookup returns a full article
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: { title: "Found", content: "<p>Full content</p>" } }),
+        json: async () => ({ data: { title: "Found", content: "<p>Full</p>" } }),
       } as any);
 
       const adapter = createAdapter();
-      const article = await adapter.getArticleBySlug("found");
-      expect(article).toMatchObject({ title: "Found", slug: "found", content: "<p>Full content</p>" });
+      const article = await adapter.getArticleBySlug(uuid);
+      expect(article).toMatchObject({ title: "Found", content: "<p>Full</p>" });
     });
 
-    it("should fallback to list then fetch full article by native ID", async () => {
+    it("should skip direct lookup for human-readable slugs and use list-based search", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // 1. Direct lookup returns an article but its generated slug won't match "my-slug"
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ data: { title: "Different Title" } }),
-      } as any);
+      // Only 2 fetches: list + fetch by ID (no direct lookup for readable slugs)
 
-      // 2. Fallback: _getRawArticles returns a list with a matching raw article (with id)
+      // 1. _getRawArticles returns a list with a matching raw article (with id)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -352,7 +352,7 @@ describe("ContentAPIAdapter", () => {
         ],
       } as any);
 
-      // 3. Fetch full article by native ID
+      // 2. Fetch full article by native ID
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -368,14 +368,7 @@ describe("ContentAPIAdapter", () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // Direct lookup: 404
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: "Not Found",
-      } as any);
-
-      // Fallback: _getRawArticles returns empty
+      // _getRawArticles returns empty (no direct lookup for human-readable slug)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -391,9 +384,7 @@ describe("ContentAPIAdapter", () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // Direct lookup throws
-      mockFetch.mockRejectedValueOnce(new Error("Network error"));
-      // Fallback _getRawArticles also throws
+      // _getRawArticles throws
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       const adapter = createAdapter();
@@ -401,9 +392,11 @@ describe("ContentAPIAdapter", () => {
       expect(article).toBeNull();
     });
 
-    it("should return article directly when no data wrapper and slug matches", async () => {
+    it("should return article directly when no data wrapper and slug is UUID", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
+
+      const uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -412,22 +405,15 @@ describe("ContentAPIAdapter", () => {
       } as any);
 
       const adapter = createAdapter();
-      const article = await adapter.getArticleBySlug("direct");
-      expect(article).toMatchObject({ title: "Direct", slug: "direct", content: "Some content" });
+      const article = await adapter.getArticleBySlug(uuid);
+      expect(article).toMatchObject({ title: "Direct", content: "Some content" });
     });
 
     it("should return list version when fetch by ID fails", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
-      // 1. Direct lookup: 500
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: "Internal Server Error",
-      } as any);
-
-      // 2. Fallback: _getRawArticles returns matching article
+      // 1. _getRawArticles returns matching article
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -436,17 +422,53 @@ describe("ContentAPIAdapter", () => {
         ],
       } as any);
 
-      // 3. Fetch by ID also fails
+      // 2. Fetch by ID fails
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: "Internal Server Error",
+        text: async () => "error",
       } as any);
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("server-error");
       // Falls back to transformed list version (without content)
       expect(article).toMatchObject({ title: "Server Error", slug: "server-error" });
+    });
+
+    it("should fallback to list when UUID direct lookup returns 404", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      const uuid = "d3d436d9-139a-4cf8-a0b6-ab4733b2da70";
+
+      // 1. Direct lookup: 404
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        text: async () => "not found",
+      } as any);
+
+      // 2. _getRawArticles returns a matching article
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [
+          { id: uuid, title: "Recovered", status: "published" },
+        ],
+      } as any);
+
+      // 3. Fetch by native ID
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { id: uuid, title: "Recovered", content: "<p>OK</p>", status: "published" } }),
+      } as any);
+
+      const adapter = createAdapter();
+      const article = await adapter.getArticleBySlug(uuid);
+      expect(article).toMatchObject({ title: "Recovered", content: "<p>OK</p>" });
     });
   });
 
