@@ -151,26 +151,40 @@ export class ContentAPIAdapter {
   }
 
   /**
-   * Récupère un article spécifique par son ID ou slug
+   * Récupère un article spécifique par son slug (généré depuis le titre)
+   * ou par son ID natif.
+   *
+   * Strategy:
+   * 1. Try a direct API lookup (works if slug is a UUID / native API id)
+   * 2. If that fails (404 or the returned article's generated slug doesn't match),
+   *    fall back to fetching all articles and finding the one whose generated slug matches.
    */
   async getArticleBySlug(slug: string): Promise<Article | null> {
     try {
       const safeSlug = sanitizeSlug(slug);
-      const response = await this.authenticatedFetch(
-        `${this._articlesUrl.replace(this._baseUrl, "")}/${safeSlug}`,
-      );
 
-      if (response.status === 404) {
-        return null;
+      // 1. Try direct API lookup (UUID or native identifier)
+      try {
+        const response = await this.authenticatedFetch(
+          `${this._articlesUrl.replace(this._baseUrl, "")}/${safeSlug}`,
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          const raw = result.data || result;
+          const transformed = this.transformArticle(raw);
+          // Verify the generated slug actually matches what was requested
+          if (transformed.slug === safeSlug) {
+            return transformed;
+          }
+        }
+      } catch {
+        // Direct lookup failed — fall through to list-based search
       }
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch article: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const raw = result.data || result;
-      return this.transformArticle(raw);
+      // 2. Fallback: fetch all articles and find by generated slug
+      const allArticles = await this.getAllArticles();
+      return allArticles.find((a) => a.slug === safeSlug) || null;
     } catch (error) {
       console.error(
         "Error fetching article from content API:",

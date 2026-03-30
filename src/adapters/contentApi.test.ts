@@ -316,29 +316,63 @@ describe("ContentAPIAdapter", () => {
   });
 
   describe("getArticleBySlug", () => {
-    it("should return article for valid slug", async () => {
+    it("should return article when direct lookup slug matches", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
+      // Direct lookup returns an article whose generated slug matches "found"
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: { title: "Found", slug: "test" } }),
+        json: async () => ({ data: { title: "Found" } }),
       } as any);
 
       const adapter = createAdapter();
-      const article = await adapter.getArticleBySlug("test");
+      const article = await adapter.getArticleBySlug("found");
       expect(article).toMatchObject({ title: "Found", slug: "found" });
     });
 
-    it("should return null for 404", async () => {
+    it("should fallback to list when direct lookup slug does not match", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
+      // Direct lookup returns an article but its generated slug won't match "my-slug"
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { title: "Different Title" } }),
+      } as any);
+
+      // Fallback: getAllArticles returns a list with a matching article
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [
+          { title: "My Slug", status: "published" },
+        ],
+      } as any);
+
+      const adapter = createAdapter();
+      const article = await adapter.getArticleBySlug("my-slug");
+      expect(article).toMatchObject({ title: "My Slug", slug: "my-slug" });
+    });
+
+    it("should return null when article not found anywhere", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      // Direct lookup: 404
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: "Not Found",
+      } as any);
+
+      // Fallback: getAllArticles returns empty
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
       } as any);
 
       const adapter = createAdapter();
@@ -350,6 +384,9 @@ describe("ContentAPIAdapter", () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
+      // Direct lookup throws
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+      // Fallback also throws
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       const adapter = createAdapter();
@@ -357,14 +394,14 @@ describe("ContentAPIAdapter", () => {
       expect(article).toBeNull();
     });
 
-    it("should return article directly when no data wrapper", async () => {
+    it("should return article directly when no data wrapper and slug matches", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ title: "Direct", slug: "direct" }),
+        json: async () => ({ title: "Direct" }),
       } as any);
 
       const adapter = createAdapter();
@@ -372,14 +409,22 @@ describe("ContentAPIAdapter", () => {
       expect(article).toMatchObject({ title: "Direct", slug: "direct" });
     });
 
-    it("should return null on non-404 error response", async () => {
+    it("should return null on non-404 error and empty list fallback", async () => {
       const { fetchWithTimeout } = await import("../utils/security");
       const mockFetch = vi.mocked(fetchWithTimeout);
 
+      // Direct lookup: 500
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: "Internal Server Error",
+      } as any);
+
+      // Fallback: getAllArticles returns empty
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
       } as any);
 
       const adapter = createAdapter();
