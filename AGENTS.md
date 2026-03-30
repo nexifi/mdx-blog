@@ -365,12 +365,15 @@ export const getStaticProps = createGetStaticProps({
 export default BlogArticlePage;
 ```
 
-#### Next.js App Router (Server Component — recommended)
+#### Next.js App Router (Server Component — recommended, with SSG)
+
+Articles should be **statically generated at build time** using `generateStaticParams`. This pre-renders every article page during `next build`, resulting in instant page loads and zero runtime API calls for known articles. Use `revalidate` for ISR (Incremental Static Regeneration) to pick up new articles without a full rebuild.
 
 **IMPORTANT**: Do NOT use `next-mdx-remote/rsc` (`<MDXRemote>` or `compileMDX`) in Next.js 15+ App Router — it causes uncatchable RSC streaming errors (`Cannot read properties of undefined (reading 'stack')`, `ReadableStream is already closed`). Use `renderMarkdown` from the server entry point instead:
 
 ```tsx
-// app/[locale]/blog/[slug]/page.tsx (Server Component)
+// app/[locale]/blog/[slug]/page.tsx (Server Component — SSG + ISR)
+import { notFound } from 'next/navigation';
 import { ContentAPIAdapter, renderMarkdown } from '@nexifi/mdx-blog/server';
 import { ArticleHead, ArticleSchema, ArticleLayout } from '@nexifi/mdx-blog';
 
@@ -378,6 +381,17 @@ const adapter = new ContentAPIAdapter({
   apiKey: process.env.CONTENT_API_KEY!,
   baseUrl: process.env.CONTENT_API_URL,
 });
+
+// Revalidate every hour (ISR) — remove for fully static
+export const revalidate = 3600;
+
+// Pre-render all articles at build time
+export async function generateStaticParams() {
+  const articles = await adapter.getAllArticles();
+  return articles
+    .filter((a) => a.published !== false)
+    .map((article) => ({ slug: article.slug }));
+}
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -526,6 +540,122 @@ export const getServerSideProps = createLlmsServerSideProps({
 
 ```tsx
 // pages/llms-full.txt.tsx — same, add `full: true` to config
+```
+
+### Step 8 — Create sitemap & robots.txt (recommended for SEO)
+
+Articles should be fetched at **build time** for the sitemap to ensure fast crawler responses and reduce runtime API calls. Next.js App Router provides a native `sitemap.ts` convention that runs at build time and supports ISR revalidation.
+
+#### Next.js App Router — `sitemap.ts` (recommended, build-time)
+
+```typescript
+// app/sitemap.ts
+import type { MetadataRoute } from 'next';
+import { ContentAPIAdapter } from '@nexifi/mdx-blog/server';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+// Revalidate every hour (ISR) — remove for fully static
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const articles = await adapter.getAllArticles();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
+
+  return [
+    { url: siteUrl, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
+    { url: `${siteUrl}/blog`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    ...articles
+      .filter((a) => a.published !== false)
+      .map((article) => ({
+        url: `${siteUrl}/blog/${article.slug}`,
+        lastModified: new Date(article.date),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      })),
+  ];
+}
+```
+
+#### Next.js App Router — `robots.ts` (build-time)
+
+```typescript
+// app/robots.ts
+import type { MetadataRoute } from 'next';
+
+export default function robots(): MetadataRoute.Robots {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
+  return {
+    rules: { userAgent: '*', allow: '/', disallow: ['/api/', '/admin/'] },
+    sitemap: `${siteUrl}/sitemap.xml`,
+  };
+}
+```
+
+#### Next.js App Router — Route Handler alternative (dynamic, per-request)
+
+```typescript
+// app/sitemap.xml/route.ts
+import { ContentAPIAdapter, generateSitemap } from '@nexifi/mdx-blog/server';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+export async function GET() {
+  const articles = await adapter.getAllArticles();
+  const xml = generateSitemap(articles, {
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com',
+    blogPath: '/blog',
+  });
+  return new Response(xml, {
+    headers: {
+      'Content-Type': 'application/xml',
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+    },
+  });
+}
+```
+
+#### Next.js Pages Router
+
+```tsx
+// pages/sitemap.xml.tsx
+import { SitemapPage, createSitemapServerSideProps } from '@nexifi/mdx-blog/server';
+
+export default SitemapPage;
+export const getServerSideProps = createSitemapServerSideProps({
+  siteUrl: 'https://example.com',
+  blogPath: '/blog',
+  useContentAPI: true,
+  contentAPIConfig: { apiKey: process.env.CONTENT_API_KEY! },
+  additionalPages: [
+    { path: '/', priority: 1.0, changefreq: 'daily' },
+  ],
+});
+```
+
+#### Build script (any framework — generates static files)
+
+```typescript
+// scripts/generate-seo.ts
+import { generateBuildTimeSEO } from '@nexifi/mdx-blog/server';
+
+await generateBuildTimeSEO({
+  siteUrl: 'https://example.com',
+  apiKey: process.env.CONTENT_API_KEY,
+  blogPath: '/blog',
+  staticPages: [
+    { path: '/', priority: 1.0, changefreq: 'daily' },
+    { path: '/about', priority: 0.8, changefreq: 'monthly' },
+  ],
+  disallowPaths: ['/api/*', '/admin/*'],
+});
+// → Writes sitemap.xml + robots.txt to ./public/
 ```
 
 ---

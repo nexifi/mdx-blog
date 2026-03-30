@@ -870,10 +870,10 @@ Follow these steps IN ORDER:
    - App Router: use BlogListPage component with "use client" directive
    - Pages Router: include BlogListHead + BlogListSchema for SEO
 7. Create the blog article page:
-   - App Router: export generateMetadata() for SEO and generateStaticParams() for SSG, use BlogArticlePage
+   - App Router: export generateMetadata() for SEO and generateStaticParams() for SSG (build-time), add \`export const revalidate = 3600\` for ISR, use renderMarkdown from @nexifi/mdx-blog/server (NOT next-mdx-remote/rsc)
    - Pages Router: use getStaticPaths/getStaticProps with ArticleHead + ArticleSchema for SEO
 8. Create sitemap:
-   - App Router: export a sitemap() function in app/sitemap.ts using ContentAPIAdapter to fetch articles
+   - App Router: export a sitemap() function in app/sitemap.ts using ContentAPIAdapter to fetch articles at build time, add \`export const revalidate = 3600\` for ISR
    - Pages Router: use SitemapPage component with createSitemapServerSideProps
 9. Create robots.txt:
    - App Router: export a robots() function in app/robots.ts (Next.js metadata API)

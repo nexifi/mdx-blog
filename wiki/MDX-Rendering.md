@@ -39,16 +39,30 @@ const html = renderMarkdownSync(article.content || '');
 | `breaks` | `boolean` | `false` | Convert single newlines to `<br>` |
 | `markedOptions` | `MarkedOptions` | — | Custom `marked` options (overrides gfm/breaks) |
 
-### Usage in Next.js App Router (Server Component)
+### Usage in Next.js App Router (Server Component — SSG + ISR)
+
+Articles are pre-rendered at build time via `generateStaticParams` and revalidated periodically via ISR.
 
 ```tsx
 // app/blog/[slug]/page.tsx
+import { notFound } from 'next/navigation';
 import { ContentAPIAdapter, renderMarkdown } from '@nexifi/mdx-blog/server';
 
 const adapter = new ContentAPIAdapter({
   apiKey: process.env.CONTENT_API_KEY!,
   baseUrl: process.env.CONTENT_API_URL,
 });
+
+// Revalidate every hour (ISR) — remove for fully static
+export const revalidate = 3600;
+
+// Pre-render all articles at build time
+export async function generateStaticParams() {
+  const articles = await adapter.getAllArticles();
+  return articles
+    .filter((a) => a.published !== false)
+    .map((article) => ({ slug: article.slug }));
+}
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

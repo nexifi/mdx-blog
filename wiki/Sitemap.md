@@ -165,11 +165,64 @@ Generates sitemap + robots.txt + llms.txt + RSS + Atom in one call.
 
 ## Framework Integration
 
-### Next.js App Router
+### Next.js App Router — `sitemap.ts` (recommended, build-time)
+
+The recommended approach uses Next.js's native `sitemap.ts` convention. Articles are fetched **at build time**, ensuring fast crawler responses and no runtime API calls. Use `revalidate` for ISR.
+
+```typescript
+// app/sitemap.ts
+import type { MetadataRoute } from 'next';
+import { ContentAPIAdapter } from '@nexifi/mdx-blog/server';
+
+const adapter = new ContentAPIAdapter({
+  apiKey: process.env.CONTENT_API_KEY!,
+  baseUrl: process.env.CONTENT_API_URL,
+});
+
+// Revalidate every hour (ISR) — remove for fully static
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const articles = await adapter.getAllArticles();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
+
+  return [
+    { url: siteUrl, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
+    { url: `${siteUrl}/blog`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    ...articles
+      .filter((a) => a.published !== false)
+      .map((article) => ({
+        url: `${siteUrl}/blog/${article.slug}`,
+        lastModified: new Date(article.date),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      })),
+  ];
+}
+```
+
+#### robots.ts (build-time)
+
+```typescript
+// app/robots.ts
+import type { MetadataRoute } from 'next';
+
+export default function robots(): MetadataRoute.Robots {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
+  return {
+    rules: { userAgent: '*', allow: '/', disallow: ['/api/', '/admin/'] },
+    sitemap: `${siteUrl}/sitemap.xml`,
+  };
+}
+```
+
+### Next.js App Router — Route Handler (dynamic, per-request)
+
+Use this approach only if you need the sitemap to reflect changes in real time without waiting for revalidation.
 
 ```typescript
 // app/sitemap.xml/route.ts
-import { ContentAPIAdapter, getArticleSitemapEntries, generateSitemap } from '@nexifi/mdx-blog/server';
+import { ContentAPIAdapter, generateSitemap } from '@nexifi/mdx-blog/server';
 
 const adapter = new ContentAPIAdapter({
   apiKey: process.env.CONTENT_API_KEY!,
@@ -178,15 +231,10 @@ const adapter = new ContentAPIAdapter({
 
 export async function GET() {
   const articles = await adapter.getAllArticles();
-  const blogEntries = getArticleSitemapEntries(articles, 'https://example.com', '/blog');
-
-  const entries = [
-    { url: 'https://example.com/', priority: 1.0, changefreq: 'daily' as const },
-    { url: 'https://example.com/blog', priority: 0.9, changefreq: 'weekly' as const },
-    ...blogEntries,
-  ];
-
-  const xml = generateSitemap(entries);
+  const xml = generateSitemap(articles, {
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com',
+    blogPath: '/blog',
+  });
 
   return new Response(xml, {
     headers: {
