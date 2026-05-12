@@ -82,6 +82,7 @@ export function ArticleHead({
 
   // Date formatée pour les meta
   const publishedTime = formatISODate(article.date);
+  const modifiedTime = formatISODate(article.updatedAt ?? article.date);
 
   return (
     <Head>
@@ -115,7 +116,7 @@ export function ArticleHead({
 
       {/* Article specifics (Open Graph) */}
       <meta property="article:published_time" content={publishedTime} />
-      <meta property="article:modified_time" content={publishedTime} />
+      <meta property="article:modified_time" content={modifiedTime} />
       <meta property="article:section" content={article.category} />
       {article.tags?.map((tag) => (
         <meta property="article:tag" content={tag} key={tag} />

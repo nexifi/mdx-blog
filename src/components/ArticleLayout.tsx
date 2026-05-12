@@ -117,12 +117,25 @@ export function ArticleLayout({
 
           <div className="p-6 md:p-10">
             {/* Métadonnées */}
-            <div className="flex items-center text-sm text-gray-500 mb-4">
-              <IconCalendar className="mr-2" />
-              <span>{article.date}</span>
+            <div className="flex flex-wrap items-center text-sm text-gray-500 mb-4 gap-x-3 gap-y-1">
+              <span className="inline-flex items-center">
+                <IconCalendar className="mr-2" />
+                <time dateTime={toISOorRaw(article.date)}>{article.date}</time>
+              </span>
+              {hasMeaningfulUpdate(article.date, article.updatedAt) && (
+                <span className="inline-flex items-center">
+                  <span aria-hidden="true">•</span>
+                  <span className="ml-3">
+                    {labels.updatedOn}{" "}
+                    <time dateTime={toISOorRaw(article.updatedAt!)}>
+                      {formatDisplayDate(article.updatedAt!)}
+                    </time>
+                  </span>
+                </span>
+              )}
               {article.readTime && (
                 <>
-                  <span className="mx-3">•</span>
+                  <span aria-hidden="true">•</span>
                   <span>{article.readTime} {labels.minRead}</span>
                 </>
               )}
@@ -325,6 +338,33 @@ export function ArticleLayout({
       </div>
     </section>
   );
+}
+
+function toISOorRaw(value: string): string {
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? value : d.toISOString();
+}
+
+function formatDisplayDate(value: string): string {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function hasMeaningfulUpdate(
+  published: string,
+  updated: string | undefined,
+): updated is string {
+  if (!updated) return false;
+  const a = new Date(published).getTime();
+  const b = new Date(updated).getTime();
+  if (isNaN(a) || isNaN(b)) return false;
+  // Show "updated on" only if the gap is at least 24h
+  return b - a >= 24 * 60 * 60 * 1000;
 }
 
 export default ArticleLayout;

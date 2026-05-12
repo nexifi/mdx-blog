@@ -11,6 +11,8 @@
  *   import { BlogArticlePage, MDXProvider } from "@nexifi/mdx-blog/mdx";
  */
 
+import "server-only";
+
 // MDX Article Page (depends on next-mdx-remote + remark-gfm + rehype-highlight)
 export {
   BlogArticlePage,

@@ -1,6 +1,11 @@
 import React from "react";
 import { Article } from "../types";
 import { safeJsonLd } from "../utils/security";
+import {
+  extractFAQsFromMarkdown,
+  extractHowToFromMarkdown,
+  countWords,
+} from "../utils/seoExtract";
 
 /**
  * Configuration pour les données structurées Schema.org
@@ -24,6 +29,10 @@ export interface SchemaConfig {
   blogLabel?: string;
   /** Label prefix for blog list description (default: "Discover all articles from") */
   discoverArticlesLabel?: string;
+  /** Disable automatic FAQPage extraction from H2/H3 questions (default: false) */
+  disableAutoFAQ?: boolean;
+  /** Disable automatic HowTo extraction from "Étape N / Step N" headings (default: false) */
+  disableAutoHowTo?: boolean;
 }
 
 interface ArticleSchemaProps {
@@ -32,21 +41,14 @@ interface ArticleSchemaProps {
 }
 
 /**
- * Génère les données structurées JSON-LD pour un article de blog
- * Inclut : BlogPosting, BreadcrumbList, Organization
+ * Génère les données structurées JSON-LD pour un article de blog.
  *
- * @example
- * ```tsx
- * <ArticleSchema
- *   article={article}
- *   config={{
- *     siteUrl: "https://example.com",
- *     siteName: "Mon Site",
- *     logoUrl: "https://example.com/logo.png",
- *     blogPath: "/blog"
- *   }}
- * />
- * ```
+ * Schémas émis :
+ * - `BlogPosting` (avec `dateModified` issu de `article.updatedAt` si fourni)
+ * - `BreadcrumbList`
+ * - `WebPage`
+ * - `FAQPage` (auto, si questions détectées dans le contenu ou `article.faqs` fourni)
+ * - `HowTo` (auto, si étapes "Étape N / Step N" détectées ou `article.howToSteps` fourni)
  */
 export function ArticleSchema({ article, config }: ArticleSchemaProps) {
   const {
@@ -56,13 +58,19 @@ export function ArticleSchema({ article, config }: ArticleSchemaProps) {
     blogPath = "/blog",
     locale = "fr-FR",
     organizationType = "Organization",
+    disableAutoFAQ = false,
+    disableAutoHowTo = false,
   } = config;
 
-  const articleUrl = `${siteUrl}${blogPath}/${article.slug}`;
-  const blogUrl = `${siteUrl}${blogPath}`;
+  const baseUrl = siteUrl.replace(/\/$/, "");
+  const articleUrl = `${baseUrl}${blogPath}/${article.slug}`;
+  const blogUrl = `${baseUrl}${blogPath}`;
+
+  const datePublished = formatDate(article.date);
+  const dateModified = formatDate(article.updatedAt ?? article.date);
 
   // Schema BlogPosting / Article
-  const articleSchema = {
+  const articleSchema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     "@id": `${articleUrl}#article`,
@@ -77,29 +85,33 @@ export function ArticleSchema({ article, config }: ArticleSchemaProps) {
           "@type": "ImageObject",
           url: article.image.startsWith("http")
             ? article.image
-            : `${siteUrl}${article.image}`,
+            : `${baseUrl}${article.image}`,
           width: article.imageWidth || 1200,
           height: article.imageHeight || 630,
         }
       : undefined,
-    datePublished: formatDate(article.date),
-    dateModified: formatDate(article.date), // Utiliser updatedAt si disponible
+    datePublished,
+    dateModified,
     author: {
       "@type": "Person",
       name: article.author || siteName,
+      ...(article.authorUrl && { url: article.authorUrl }),
+      ...(article.authorSameAs &&
+        article.authorSameAs.length > 0 && { sameAs: article.authorSameAs }),
       ...(article.authorImage && {
         image: article.authorImage.startsWith("http")
           ? article.authorImage
-          : `${siteUrl}${article.authorImage}`,
+          : `${baseUrl}${article.authorImage}`,
       }),
     },
     publisher: {
       "@type": organizationType,
+      "@id": `${baseUrl}#organization`,
       name: siteName,
       ...(logoUrl && {
         logo: {
           "@type": "ImageObject",
-          url: logoUrl.startsWith("http") ? logoUrl : `${siteUrl}${logoUrl}`,
+          url: logoUrl.startsWith("http") ? logoUrl : `${baseUrl}${logoUrl}`,
           width: 600,
           height: 60,
         },
@@ -118,12 +130,13 @@ export function ArticleSchema({ article, config }: ArticleSchemaProps) {
   const breadcrumbSchema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
+    "@id": `${articleUrl}#breadcrumb`,
     itemListElement: [
       {
         "@type": "ListItem",
         position: 1,
         name: config.homeLabel ?? "Home",
-        item: siteUrl,
+        item: baseUrl,
       },
       {
         "@type": "ListItem",
@@ -155,10 +168,12 @@ export function ArticleSchema({ article, config }: ArticleSchemaProps) {
     name: article.title,
     description: article.excerpt || "",
     inLanguage: locale,
+    datePublished,
+    dateModified,
     isPartOf: {
       "@type": "WebSite",
-      "@id": `${siteUrl}#website`,
-      url: siteUrl,
+      "@id": `${baseUrl}#website`,
+      url: baseUrl,
       name: siteName,
       inLanguage: locale,
     },
@@ -167,13 +182,63 @@ export function ArticleSchema({ article, config }: ArticleSchemaProps) {
           "@type": "ImageObject",
           url: article.image.startsWith("http")
             ? article.image
-            : `${siteUrl}${article.image}`,
+            : `${baseUrl}${article.image}`,
         }
       : undefined,
     breadcrumb: {
       "@id": `${articleUrl}#breadcrumb`,
     },
   };
+
+  // FAQPage (manual override > auto-extract)
+  const faqs =
+    article.faqs && article.faqs.length > 0
+      ? article.faqs
+      : disableAutoFAQ
+        ? []
+        : extractFAQsFromMarkdown(article.content);
+
+  const faqSchema =
+    faqs.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "@id": `${articleUrl}#faq`,
+          mainEntity: faqs.map((faq) => ({
+            "@type": "Question",
+            name: faq.question,
+            acceptedAnswer: { "@type": "Answer", text: faq.answer },
+          })),
+        }
+      : null;
+
+  // HowTo (manual override > auto-extract)
+  const howToSteps =
+    article.howToSteps && article.howToSteps.length >= 2
+      ? article.howToSteps
+      : disableAutoHowTo
+        ? []
+        : extractHowToFromMarkdown(article.content);
+
+  const howToSchema =
+    howToSteps.length >= 2
+      ? {
+          "@context": "https://schema.org",
+          "@type": "HowTo",
+          "@id": `${articleUrl}#howto`,
+          name: article.title,
+          ...(article.excerpt && { description: article.excerpt }),
+          ...(article.readTime && { totalTime: `PT${article.readTime}M` }),
+          step: howToSteps.map((step, idx) => ({
+            "@type": "HowToStep",
+            position: idx + 1,
+            name: step.name,
+            text: step.text,
+            ...(step.url && { url: step.url }),
+            ...(step.image && { image: step.image }),
+          })),
+        }
+      : null;
 
   return (
     <>
@@ -195,12 +260,28 @@ export function ArticleSchema({ article, config }: ArticleSchemaProps) {
           __html: safeJsonLd(webPageSchema),
         }}
       />
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: safeJsonLd(faqSchema),
+          }}
+        />
+      )}
+      {howToSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: safeJsonLd(howToSchema),
+          }}
+        />
+      )}
     </>
   );
 }
 
 /**
- * Génère le schema JSON-LD pour la page liste du blog
+ * Génère le schema JSON-LD pour la page liste du blog (`CollectionPage` + `Blog`).
  */
 export function BlogListSchema({
   config,
@@ -210,7 +291,8 @@ export function BlogListSchema({
   articles: Article[];
 }) {
   const { siteUrl, siteName, blogPath = "/blog", locale = "fr-FR" } = config;
-  const blogUrl = `${siteUrl}${blogPath}`;
+  const baseUrl = siteUrl.replace(/\/$/, "");
+  const blogUrl = `${baseUrl}${blogPath}`;
 
   const collectionSchema = {
     "@context": "https://schema.org",
@@ -222,18 +304,31 @@ export function BlogListSchema({
     inLanguage: locale,
     isPartOf: {
       "@type": "WebSite",
-      "@id": `${siteUrl}#website`,
-      url: siteUrl,
+      "@id": `${baseUrl}#website`,
+      url: baseUrl,
       name: siteName,
     },
     mainEntity: {
-      "@type": "ItemList",
-      itemListElement: articles.slice(0, 10).map((article, index) => ({
-        "@type": "ListItem",
-        position: index + 1,
-        url: `${blogUrl}/${article.slug}`,
-        name: article.title,
-      })),
+      "@type": "Blog",
+      "@id": `${blogUrl}#blog`,
+      name: `${siteName} — Blog`,
+      url: blogUrl,
+      inLanguage: locale,
+      publisher: { "@id": `${baseUrl}#organization`, name: siteName },
+      blogPost: articles
+        .filter((a) => a.published !== false)
+        .slice(0, 20)
+        .map((article) => ({
+          "@type": "BlogPosting",
+          "@id": `${blogUrl}/${article.slug}#article`,
+          headline: article.title,
+          url: `${blogUrl}/${article.slug}`,
+          datePublished: formatDate(article.date),
+          dateModified: formatDate(article.updatedAt ?? article.date),
+          ...(article.author && {
+            author: { "@type": "Person", name: article.author },
+          }),
+        })),
     },
   };
 
@@ -254,22 +349,12 @@ function formatDate(date: string): string {
   try {
     const d = new Date(date);
     if (isNaN(d.getTime())) {
-      // Essayer de parser des formats français comme "15 janvier 2024"
       return new Date().toISOString();
     }
     return d.toISOString();
   } catch {
     return new Date().toISOString();
   }
-}
-
-/**
- * Helper pour compter les mots d'un contenu
- */
-function countWords(content: string): number {
-  // Retirer les balises HTML/MDX
-  const text = content.replace(/<[^>]*>/g, "").replace(/[#*`_\[\]]/g, "");
-  return text.split(/\s+/).filter((word) => word.length > 0).length;
 }
 
 export default ArticleSchema;

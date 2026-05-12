@@ -90,7 +90,16 @@ describe("ContentAPIAdapter", () => {
   });
 
   describe("transformArticle (static)", () => {
-    it("should generate slug from title", () => {
+    it("should use slug from API when provided", () => {
+      const result = ContentAPIAdapter.transformArticle({
+        title: "Mon Article Génial",
+        slug: "custom-slug-from-api",
+        content: "<p>Hello</p>",
+      });
+      expect(result.slug).toBe("custom-slug-from-api");
+    });
+
+    it("should generate slug from title when no slug in API", () => {
       const result = ContentAPIAdapter.transformArticle({
         title: "Mon Article Génial",
         content: "<p>Hello</p>",
@@ -98,7 +107,7 @@ describe("ContentAPIAdapter", () => {
       expect(result.slug).toBe("mon-article-genial");
     });
 
-    it("should use id as fallback slug when no title", () => {
+    it("should use id as fallback slug when no slug and no title", () => {
       const result = ContentAPIAdapter.transformArticle({
         id: "abc-123",
         content: "",
@@ -178,11 +187,19 @@ describe("ContentAPIAdapter", () => {
       expect(result.author).toBe("Author");
     });
 
-    it("should strip accents from slug", () => {
+    it("should strip accents from slug when generating from title", () => {
       const result = ContentAPIAdapter.transformArticle({
         title: "Café résumé naïf",
       });
       expect(result.slug).toBe("cafe-resume-naif");
+    });
+
+    it("should prefer slug from API over generated slug from title", () => {
+      const result = ContentAPIAdapter.transformArticle({
+        title: "Café résumé naïf",
+        slug: "cafe-resume",
+      });
+      expect(result.slug).toBe("cafe-resume");
     });
   });
 
@@ -343,12 +360,12 @@ describe("ContentAPIAdapter", () => {
 
       // Only 2 fetches: list + fetch by ID (no direct lookup for readable slugs)
 
-      // 1. _getRawArticles returns a list with a matching raw article (with id)
+      // 1. _getRawArticles returns a list with a matching raw article (with id and slug)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => [
-          { id: "uuid-123", title: "My Slug", status: "published" },
+          { id: "uuid-123", title: "My Slug", slug: "my-slug", status: "published" },
         ],
       } as any);
 
@@ -356,12 +373,37 @@ describe("ContentAPIAdapter", () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: { id: "uuid-123", title: "My Slug", content: "<p>Full</p>", status: "published" } }),
+        json: async () => ({ data: { id: "uuid-123", title: "My Slug", slug: "my-slug", content: "<p>Full</p>", status: "published" } }),
       } as any);
 
       const adapter = createAdapter();
       const article = await adapter.getArticleBySlug("my-slug");
       expect(article).toMatchObject({ title: "My Slug", slug: "my-slug", content: "<p>Full</p>" });
+    });
+
+    it("should match by slug field from API in list-based search", async () => {
+      const { fetchWithTimeout } = await import("../utils/security");
+      const mockFetch = vi.mocked(fetchWithTimeout);
+
+      // 1. _getRawArticles returns articles with slug field from API
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [
+          { id: "uuid-789", title: "Article Titre Diff\u00e9rent", slug: "custom-api-slug", status: "published" },
+        ],
+      } as any);
+
+      // 2. Fetch full article by native ID
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { id: "uuid-789", title: "Article Titre Diff\u00e9rent", slug: "custom-api-slug", content: "<p>Content</p>", status: "published" } }),
+      } as any);
+
+      const adapter = createAdapter();
+      const article = await adapter.getArticleBySlug("custom-api-slug");
+      expect(article).toMatchObject({ title: "Article Titre Diff\u00e9rent", slug: "custom-api-slug", content: "<p>Content</p>" });
     });
 
     it("should return null when article not found anywhere", async () => {

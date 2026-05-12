@@ -21,9 +21,27 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 import { z } from "zod";
-import { Agent, run, tool } from "@openai/agents";
 import type { ProjectInfo } from "./types.js";
 import { ProjectAnalyzer } from "./analyzer.js";
+
+type AgentsSdk = typeof import("@openai/agents");
+type ToolFn = AgentsSdk["tool"];
+
+async function loadAgentsSdk(): Promise<AgentsSdk> {
+  try {
+    return await import("@openai/agents");
+  } catch {
+    console.error(
+      "\n❌ The integration agent requires '@openai/agents' (optional peer dependency).\n\n" +
+        "Install it once in your project:\n" +
+        "  npm install -D @openai/agents\n" +
+        "  pnpm add -D @openai/agents\n" +
+        "  yarn add -D @openai/agents\n\n" +
+        "Then re-run this command.\n",
+    );
+    process.exit(1);
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -199,7 +217,7 @@ function rollback(
 /**
  * Create a read_file tool scoped to the given project directory.
  */
-function createReadFileTool(cwd: string, verbose: boolean) {
+function createReadFileTool(tool: ToolFn, cwd: string, verbose: boolean) {
   return tool({
     name: "read_file",
     description:
@@ -235,6 +253,7 @@ function createReadFileTool(cwd: string, verbose: boolean) {
  * Tracks created/modified files in the provided sets.
  */
 function createWriteFileTool(
+  tool: ToolFn,
   cwd: string,
   verbose: boolean,
   createdFiles: Set<string>,
@@ -280,7 +299,7 @@ function createWriteFileTool(
 /**
  * Create a list_directory tool scoped to the given project directory.
  */
-function createListDirectoryTool(cwd: string, verbose: boolean) {
+function createListDirectoryTool(tool: ToolFn, cwd: string, verbose: boolean) {
   return tool({
     name: "list_directory",
     description:
@@ -347,6 +366,7 @@ function createListDirectoryTool(cwd: string, verbose: boolean) {
  * Useful when the agent creates a file in the wrong location.
  */
 function createDeleteFileTool(
+  tool: ToolFn,
   cwd: string,
   verbose: boolean,
   createdFiles: Set<string>,
@@ -402,7 +422,7 @@ function createDeleteFileTool(
  * Create a search_in_files tool to grep for patterns across the project.
  * Saves the agent from spending turns reading files one by one.
  */
-function createSearchInFilesTool(cwd: string, verbose: boolean) {
+function createSearchInFilesTool(tool: ToolFn, cwd: string, verbose: boolean) {
   return tool({
     name: "search_in_files",
     description:
@@ -521,7 +541,7 @@ function createSearchInFilesTool(cwd: string, verbose: boolean) {
  * Create a run_command tool scoped to the given project directory.
  * Allows build, lint, type-check, and package install commands.
  */
-function createRunCommandTool(cwd: string, verbose: boolean) {
+function createRunCommandTool(tool: ToolFn, cwd: string, verbose: boolean) {
   const ALLOWED_PREFIXES = [
     "npm run",
     "npm install",
@@ -594,6 +614,7 @@ function createRunCommandTool(cwd: string, verbose: boolean) {
  * Only allows known-safe packages from the INSTALLABLE_PACKAGES set.
  */
 function createInstallPackageTool(
+  tool: ToolFn,
   cwd: string,
   verbose: boolean,
   packageManager: string,
@@ -986,6 +1007,8 @@ export async function runAgent(
   const verbose = config.verbose !== false;
   const model = config.model || "gpt-5.4";
 
+  const { Agent, run, tool } = await loadAgentsSdk();
+
   // Resolve AGENTS.md path (from this package's root)
   const agentsMdPath = path.resolve(__dirname, "../../AGENTS.md");
   const agentsMdFallback = path.resolve(__dirname, "../../../AGENTS.md");
@@ -1009,13 +1032,18 @@ export async function runAgent(
 
   // Create tools (7 tools)
   const tools = [
-    createReadFileTool(config.cwd, verbose),
-    createWriteFileTool(config.cwd, verbose, createdFiles, modifiedFiles),
-    createDeleteFileTool(config.cwd, verbose, createdFiles),
-    createListDirectoryTool(config.cwd, verbose),
-    createSearchInFilesTool(config.cwd, verbose),
-    createRunCommandTool(config.cwd, verbose),
-    createInstallPackageTool(config.cwd, verbose, projectInfo.packageManager),
+    createReadFileTool(tool, config.cwd, verbose),
+    createWriteFileTool(tool, config.cwd, verbose, createdFiles, modifiedFiles),
+    createDeleteFileTool(tool, config.cwd, verbose, createdFiles),
+    createListDirectoryTool(tool, config.cwd, verbose),
+    createSearchInFilesTool(tool, config.cwd, verbose),
+    createRunCommandTool(tool, config.cwd, verbose),
+    createInstallPackageTool(
+      tool,
+      config.cwd,
+      verbose,
+      projectInfo.packageManager,
+    ),
   ];
 
   // Build agent instructions

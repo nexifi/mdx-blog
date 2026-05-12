@@ -10,16 +10,32 @@
  *   import { ContentAPIAdapter } from "@nexifi/mdx-blog/server";
  */
 
+import "server-only";
+
 // Types (no runtime cost)
 export type {
   Article,
   ArticleMetadata,
+  ArticleFAQ,
+  ArticleHowToStep,
   BlogApiConfig,
   PaginatedResult,
   PaginationOptions,
   ValidationError,
 } from "./types";
 export { ArticleMetadataSchema } from "./types";
+
+// SEO extraction helpers (pure functions, safe in any environment)
+export {
+  extractFAQsFromMarkdown,
+  extractHowToFromMarkdown,
+  isQuestionHeading,
+  parseMarkdownSections,
+} from "./utils/seoExtract";
+export type {
+  ExtractFAQsOptions,
+  ExtractHowToOptions,
+} from "./utils/seoExtract";
 
 // Content API Adapter (server-side HTTP client)
 export { ContentAPIAdapter } from "./adapters/contentApi";

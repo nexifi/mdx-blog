@@ -1,7 +1,11 @@
+import "server-only";
+
 // Types
 export type {
   Article,
   ArticleMetadata,
+  ArticleFAQ,
+  ArticleHowToStep,
   BlogApiConfig,
   PaginatedResult,
   PaginationOptions,
@@ -52,6 +56,36 @@ export { ArticleSchema, BlogListSchema } from "./components/ArticleSchema";
 export type { SchemaConfig } from "./components/ArticleSchema";
 export { ArticleHead, BlogListHead } from "./components/ArticleHead";
 export type { SEOConfig } from "./components/ArticleHead";
+
+// Site-wide & page-type SEO schemas (Organization, WebSite, Person, FAQ, HowTo, About)
+export {
+  OrganizationSchema,
+  WebSiteSchema,
+  PersonSchema,
+  FAQSchema,
+  HowToSchema,
+  AboutPageSchema,
+} from "./components/SiteSchemas";
+export type {
+  OrganizationSchemaConfig,
+  WebSiteSchemaConfig,
+  PersonSchemaConfig,
+  FAQSchemaProps,
+  HowToSchemaProps,
+  AboutPageSchemaConfig,
+} from "./components/SiteSchemas";
+
+// SEO extraction helpers (auto FAQ/HowTo from Markdown)
+export {
+  extractFAQsFromMarkdown,
+  extractHowToFromMarkdown,
+  isQuestionHeading,
+  parseMarkdownSections,
+} from "./utils/seoExtract";
+export type {
+  ExtractFAQsOptions,
+  ExtractHowToOptions,
+} from "./utils/seoExtract";
 
 // Sitemap Utilities
 export {

@@ -4,11 +4,19 @@
 export interface ArticleMetadata {
   title: string;
   date: string;
+  /** Date de dernière modification (ISO 8601). Utilisé pour `dateModified` JSON-LD,
+   *  `<meta property="article:modified_time">`, le `<lastmod>` sitemap et la mention
+   *  visible "Mis à jour le". Fallback sur `date` si absent. */
+  updatedAt?: string;
   category: string;
   excerpt?: string;
   author?: string;
   authorTitle?: string;
   authorImage?: string;
+  /** URL absolue de la page auteur (ex: https://site.com/author/john) — utilisée dans le JSON-LD Person */
+  authorUrl?: string;
+  /** Liens sociaux/externe de l'auteur — alimente `sameAs` dans le schéma Person */
+  authorSameAs?: string[];
   image?: string;
   /** Explicit image width (px) — used for OG meta and JSON-LD */
   imageWidth?: number;
@@ -20,6 +28,28 @@ export interface ArticleMetadata {
   readTime?: number;
   published?: boolean;
   status?: string;
+  /** FAQ explicite — si fourni, prend le pas sur l'extraction automatique depuis le contenu */
+  faqs?: ArticleFAQ[];
+  /** Étapes HowTo — si fourni, génère un JSON-LD HowTo */
+  howToSteps?: ArticleHowToStep[];
+}
+
+/**
+ * Une question/réponse FAQ. Génère une entrée `Question` dans `FAQPage` JSON-LD.
+ */
+export interface ArticleFAQ {
+  question: string;
+  answer: string;
+}
+
+/**
+ * Une étape pour un schema HowTo.
+ */
+export interface ArticleHowToStep {
+  name: string;
+  text: string;
+  url?: string;
+  image?: string;
 }
 
 /**
@@ -130,11 +160,14 @@ export const ArticleMetadataSchema = {
     return {
       title: data.title || "",
       date: data.date || new Date().toISOString(),
+      updatedAt: data.updatedAt ?? data.dateModified ?? data.updated_at,
       category: data.category || "Guide",
       excerpt: data.excerpt,
       author: data.author,
       authorTitle: data.authorTitle,
       authorImage: data.authorImage,
+      authorUrl: data.authorUrl,
+      authorSameAs: data.authorSameAs,
       image: data.image,
       imageWidth: data.imageWidth,
       imageHeight: data.imageHeight,
@@ -143,6 +176,8 @@ export const ArticleMetadataSchema = {
       readTime: data.readTime,
       published: data.published !== false,
       status: data.status,
+      faqs: data.faqs,
+      howToSteps: data.howToSteps,
     };
   },
 

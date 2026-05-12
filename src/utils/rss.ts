@@ -238,6 +238,7 @@ export function generateAtomFeed(
   for (const article of publishedArticles) {
     const articleUrl = `${blogUrl}/${article.slug}`;
     const articleDate = new Date(article.date).toISOString();
+    const articleUpdated = new Date(article.updatedAt ?? article.date).toISOString();
     const author = article.author || defaultAuthor || "Author";
 
     xml += `
@@ -246,7 +247,7 @@ export function generateAtomFeed(
     <link href="${escapeXml(articleUrl)}" rel="alternate" type="text/html"/>
     <id>${escapeXml(articleUrl)}</id>
     <published>${articleDate}</published>
-    <updated>${articleDate}</updated>
+    <updated>${articleUpdated}</updated>
     <author>
       <name>${escapeXml(author)}</name>
     </author>`;

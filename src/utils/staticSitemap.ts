@@ -387,7 +387,8 @@ export async function generateBuildTimeSEO(
   // 3. Articles
   console.log("📰 Ajout des articles...");
   articles.forEach((article) => {
-    const articleDate = article.date ? article.date.split("T")[0] : now;
+    const dateSource = article.updatedAt ?? article.date;
+    const articleDate = dateSource ? dateSource.split("T")[0] : now;
     entries.push({
       loc: `${baseUrl}${blogPath}/${article.slug}`,
       lastmod: articleDate,

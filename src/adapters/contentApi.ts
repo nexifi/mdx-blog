@@ -220,7 +220,9 @@ export class ContentAPIAdapter {
       const rawMatch = rawArticles.find((raw: any) => {
         // Match by native API id (UUID, CUID, etc.)
         if (raw.id === safeSlug) return true;
-        // Match by generated slug (human-readable)
+        // Match by slug field from API
+        if (raw.slug === safeSlug) return true;
+        // Match by generated slug (human-readable) as fallback
         const generated = this.transformArticle(raw);
         return generated.slug === safeSlug;
       });
@@ -322,15 +324,18 @@ export class ContentAPIAdapter {
     article: any,
     defaultAuthor: string = "Author",
   ): Article {
-    // Générer un slug lisible à partir du titre (ou fallback sur l'ID)
-    const slug = article.title
-      ? article.title
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "")
-      : article.id;
+    // Utiliser le slug fourni par l'API s'il existe,
+    // sinon générer un slug lisible à partir du titre (ou fallback sur l'ID)
+    const slug = article.slug
+      ? article.slug
+      : article.title
+        ? article.title
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+        : article.id;
 
     // Extraire la catégorie depuis les tags ou mettre une valeur par défaut
     const category = article.tags?.[0] || "Article";
@@ -350,10 +355,15 @@ export class ContentAPIAdapter {
       category,
       date:
         article.publishedAt || article.createdAt || new Date().toISOString(),
+      updatedAt: article.updatedAt || article.modifiedAt || undefined,
       image: article.featuredImage || undefined,
       author: article.author || defaultAuthor,
+      authorUrl: article.authorUrl || undefined,
+      authorSameAs: article.authorSameAs || undefined,
       tags: article.tags || [],
       status: article.status,
+      faqs: article.faqs || undefined,
+      howToSteps: article.howToSteps || undefined,
     };
   }
 }

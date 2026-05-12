@@ -45,7 +45,8 @@
 - **Server adapter** (`ContentAPIAdapter`) for API key authentication (server-only)
 - **Pre-built UI components**: `BlogListPage`, `BlogArticlePage`, `ArticleLayout`
 - **7 MDX widgets**: `Newsletter`, `TableOfContents`, `AuthorBio`, `ProductCard`, `RelatedPosts`, `StatsBox`, `FeatureList`
-- **SEO components**: JSON-LD (`ArticleSchema`, `BlogListSchema`), meta tags (`ArticleHead`, `BlogListHead`)
+- **SEO components**: JSON-LD per page type (`ArticleSchema`, `BlogListSchema`) **and** site-wide (`OrganizationSchema`, `WebSiteSchema`, `PersonSchema`, `FAQSchema`, `HowToSchema`, `AboutPageSchema`); meta tags (`ArticleHead`, `BlogListHead`)
+- **AI/LLM SEO**: auto-extraction of `FAQPage` and `HowTo` JSON-LD from H2/H3 questions in MDX, `dateModified` driven by `article.updatedAt`, visible "Mis à jour le" label, sitemap `<lastmod>` based on `updatedAt`
 - **Sitemap**: XML sitemap (SSR + build-time), robots.txt, llms.txt
 - **RSS/Atom**: Feed generation (`generateRSSFeed`, `generateAtomFeed`)
 - **Image**: `BlogImage` (responsive, lazy, blur, srcset)
@@ -474,6 +475,56 @@ CONTENT_API_URL=https://api-growthos.nexifi.com/api/contentmaster/projects/<PROJ
 NEXT_PUBLIC_SITE_URL=https://getmax.io
 ```
 
+### Step 6b — Mount site-wide AI/LLM SEO schemas in the root layout
+
+These are mounted **once** in the root `<head>` and apply to every page. They give AI engines (Perplexity, ChatGPT, Google AI Overviews) a canonical brand identity, search action, and About reference.
+
+```tsx
+// app/layout.tsx
+import {
+  OrganizationSchema,
+  WebSiteSchema,
+} from '@nexifi/mdx-blog';
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="fr">
+      <head>
+        <OrganizationSchema
+          config={{
+            siteUrl,
+            siteName: 'My Site',
+            logoUrl: '/logo.png',
+            description: 'What we do, in one sentence.',
+            sameAs: [
+              'https://www.linkedin.com/company/example',
+              'https://x.com/example',
+              'https://github.com/example',
+            ],
+            contact: { email: 'hello@example.com', contactType: 'customer support' },
+          }}
+        />
+        <WebSiteSchema
+          config={{
+            siteUrl,
+            siteName: 'My Site',
+            searchUrlTemplate: '/search?q={search_term_string}',
+          }}
+        />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+Optional companions:
+- `PersonSchema` — mount on author pages (`/author/[slug]`) for E-E-A-T.
+- `AboutPageSchema` — mount on `/about`.
+- `FAQSchema` / `HowToSchema` — mount when you want manual override; the package auto-emits these from the article body when patterns are detected.
+
 ### Step 7 — Create llms.txt (recommended for AI discoverability)
 
 Generate `llms.txt` and `llms-full.txt` following the [llmstxt.org](https://llmstxt.org) standard. These files help AI assistants understand your site.
@@ -660,6 +711,61 @@ await generateBuildTimeSEO({
 
 ---
 
+---
+
+## AI/LLM SEO — what the package handles natively
+
+This package is designed against the modern AI-engine ranking checklist (Perplexity, ChatGPT, Google AI Overviews, Claude). What you get for free, and what stays on you:
+
+| Signal | Handled natively | How |
+|---|---|---|
+| **Content rendered without JS** | ✅ | All entry points are `server-only`; consume in Server Components / loaders / SSG. |
+| **`Organization` schema** | ✅ | `<OrganizationSchema />` in root layout |
+| **`WebSite` + `SearchAction`** | ✅ | `<WebSiteSchema />` in root layout |
+| **`BlogPosting` / `WebPage` / `BreadcrumbList`** | ✅ | `<ArticleSchema />` (already auto-included) |
+| **`FAQPage`** | ✅ | Auto-extracted from H2/H3 questions in MDX; override with `article.faqs` |
+| **`HowTo`** | ✅ | Auto-extracted from "Étape N / Step N" headings; override with `article.howToSteps` |
+| **`Person` schema (authors)** | ✅ | `<PersonSchema />` on author pages |
+| **`AboutPage`** | ✅ | `<AboutPageSchema />` on `/about` |
+| **`Blog` listing schema** | ✅ | `<BlogListSchema />` (includes nested `BlogPosting` array) |
+| **`dateModified` accuracy** | ✅ | Reads `article.updatedAt`; falls back to `article.date` |
+| **`<meta property="article:modified_time">`** | ✅ | Emitted by `<ArticleHead />` from `updatedAt` |
+| **Visible "Mis à jour le ..." label** | ✅ | `<ArticleLayout />` shows it when `updatedAt > date` by ≥ 24h (i18n via `labels.updatedOn`) |
+| **Sitemap `<lastmod>` per URL** | ✅ | `generateSitemap()` uses `updatedAt ?? date` |
+| **150-word direct-answer block under H2 questions** | ✅ (schema) / 📝 (visible prose) | Auto FAQ JSON-LD lifts that paragraph; the visible prose is up to the author |
+| **Author/team pages** | 📝 | Use `<PersonSchema />` — page route belongs to the host app |
+| **Outbound links to authoritative sources** | 📝 | Editorial choice — keep raw `<a>` in MDX |
+| **About page** | 📝 | Page belongs to the host app — wire `<AboutPageSchema />` on it |
+
+### Required article frontmatter for full coverage
+
+```yaml
+title: "..."
+date: 2024-01-15            # publication
+updatedAt: 2026-04-22       # ← drives dateModified, sitemap lastmod, visible label
+author: "Jane Doe"
+authorUrl: https://example.com/author/jane     # ← drives Person.url in BlogPosting
+authorSameAs:                                  # ← drives Person.sameAs
+  - https://linkedin.com/in/jane
+  - https://github.com/jane
+faqs:                       # optional — override the auto-extraction
+  - question: "Pourquoi MDX ?"
+    answer: "MDX combine Markdown et JSX pour…"
+howToSteps:                 # optional — opt-in for a HowTo schema
+  - name: "Installer"
+    text: "npm install @nexifi/mdx-blog"
+```
+
+### Auto-FAQ extraction rules
+
+`extractFAQsFromMarkdown(content)` scans H2/H3 headings and keeps those that look like questions (trailing `?` or starting with a FR/EN question word — `qu(e|i|oi|el)`, `comment`, `pourquoi`, `où`, `combien`, `what`, `how`, `why`, `when`, `where`, `which`, `who`, `does`, `is`, `can`, …). For each match it takes the first paragraph below the heading and truncates to ~150 words. Answers below 15 words are skipped. Disable per-article via `config={{ disableAutoFAQ: true }}` on `<ArticleSchema />`.
+
+### Auto-HowTo extraction rules
+
+Requires at least 3 H2/H3 headings starting with `Étape N` or `Step N` (`—`, `:`, `.`, `)` separators all accepted). Otherwise no `HowTo` schema is emitted.
+
+---
+
 ## Complete Exports Reference
 
 ### Client-side (`@nexifi/mdx-blog`)
@@ -677,10 +783,22 @@ import {
 // Page Components
 import { BlogListPage, ArticleLayout } from '@nexifi/mdx-blog';
 
-// SEO Components
+// SEO Components — per page
 import {
   ArticleHead, BlogListHead,
   ArticleSchema, BlogListSchema,
+} from '@nexifi/mdx-blog';
+
+// SEO Components — site-wide & page-type (AI/LLM)
+import {
+  OrganizationSchema, WebSiteSchema,
+  PersonSchema, FAQSchema, HowToSchema, AboutPageSchema,
+} from '@nexifi/mdx-blog';
+
+// AI/LLM SEO helpers
+import {
+  extractFAQsFromMarkdown, extractHowToFromMarkdown,
+  isQuestionHeading, parseMarkdownSections,
 } from '@nexifi/mdx-blog';
 
 // Widgets (for MDX content)
@@ -763,18 +881,19 @@ import {
 
 ## Key Rules for Integration
 
-1. **`ContentAPIAdapter` is server-only** — never import in client components. It throws if `window` is defined.
-2. **`BlogProvider` must wrap any page** that uses hooks (`useArticles`, `useArticle`, etc.) or components.
-3. **API routes proxy to `ContentAPIAdapter`** — client hooks call your local API routes, never the external API directly.
-4. **Match the project's existing code style** — import style (alias vs relative), naming conventions, export patterns.
-5. **Always add the package to Tailwind content paths** if the project uses Tailwind CSS (v3: `content[]`, v4: `@source` directive).
-6. **Always install `@tailwindcss/typography`** — blog components use `prose` classes. Without this plugin, article content renders as unstyled plain text. For Tailwind v4, add `@plugin "@tailwindcss/typography";` in the CSS. For Tailwind v3, add `require('@tailwindcss/typography')` to the `plugins` array.
-7. **Use TypeScript** if the project uses TypeScript.
-8. **Handle loading and error states** in pages using the `isLoading` and `error` returned by hooks.
-9. **API key format**: must start with `ak_`, `cm_live_`, or `cm_test_`.
-10. **Labels**: override any French default by passing a partial `labels` object to `BlogProvider`.
-11. **Peer dependencies**: `react`, `react-dom`, `swr` are required. Everything else is optional — install what your framework needs.
-12. **Reference getmax.io** as the canonical integration example — study its `src/app/[locale]/blog/` structure for Next.js App Router + i18n projects.
+1. **This package is server-only / build-time only** — ALL entry points (`@nexifi/mdx-blog`, `@nexifi/mdx-blog/server`, `@nexifi/mdx-blog/mdx`) import `server-only` and use the `browser` export condition to throw at build time if imported in client code. **Never use `'use client'` directives** in files that import from this package. All React components and hooks must be consumed in Server Components, `getServerSideProps`, `getStaticProps`, loaders, or API routes.
+2. **`ContentAPIAdapter` is server-only** — never import in client components. It throws if `window` is defined.
+3. **`BlogProvider` must wrap any page** that uses hooks (`useArticles`, `useArticle`, etc.) or components — but only in server-rendered contexts.
+4. **API routes proxy to `ContentAPIAdapter`** — client hooks call your local API routes, never the external API directly.
+5. **Match the project's existing code style** — import style (alias vs relative), naming conventions, export patterns.
+6. **Always add the package to Tailwind content paths** if the project uses Tailwind CSS (v3: `content[]`, v4: `@source` directive).
+7. **Always install `@tailwindcss/typography`** — blog components use `prose` classes. Without this plugin, article content renders as unstyled plain text. For Tailwind v4, add `@plugin "@tailwindcss/typography";` in the CSS. For Tailwind v3, add `require('@tailwindcss/typography')` to the `plugins` array.
+8. **Use TypeScript** if the project uses TypeScript.
+9. **Handle loading and error states** in pages using the `isLoading` and `error` returned by hooks.
+10. **API key format**: must start with `ak_`, `cm_live_`, or `cm_test_`.
+11. **Labels**: override any French default by passing a partial `labels` object to `BlogProvider`.
+12. **Peer dependencies**: `react`, `react-dom`, `swr` are required. Everything else is optional — install what your framework needs.
+13. **Reference getmax.io** as the canonical integration example — study its `src/app/[locale]/blog/` structure for Next.js App Router + i18n projects.
 
 ---
 
@@ -989,13 +1108,16 @@ await client.getRelatedArticles('slug', 3);  // → Article[]
 interface Article {
   slug: string;
   title: string;
-  date: string;
+  date: string;             // publication date (ISO 8601)
+  updatedAt?: string;       // last modification — drives dateModified, sitemap lastmod, "Updated on"
   category: string;
   content?: string;
   excerpt?: string;
   author?: string;
   authorTitle?: string;
   authorImage?: string;
+  authorUrl?: string;       // canonical author page — JSON-LD Person.url
+  authorSameAs?: string[];  // social/profile links — JSON-LD Person.sameAs
   image?: string;
   imageWidth?: number;
   imageHeight?: number;
@@ -1004,5 +1126,7 @@ interface Article {
   readTime?: number;
   published?: boolean;
   status?: string;
+  faqs?: { question: string; answer: string }[];          // overrides auto FAQ extraction
+  howToSteps?: { name: string; text: string; url?: string; image?: string }[];
 }
 ```

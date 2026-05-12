@@ -88,7 +88,7 @@ export function generateSitemap(
       .filter((article) => article.published !== false)
       .map((article) => ({
         loc: `${blogUrl}/${article.slug}`,
-        lastmod: formatSitemapDate(article.date),
+        lastmod: formatSitemapDate(article.updatedAt ?? article.date),
         changefreq: defaultChangeFreq,
         priority: defaultPriority,
         images: article.image
@@ -217,7 +217,7 @@ export function getArticleSitemapEntries(
     .filter((article) => article.published !== false)
     .map((article) => ({
       loc: `${blogPath}/${article.slug}`,
-      lastmod: formatSitemapDate(article.date),
+      lastmod: formatSitemapDate(article.updatedAt ?? article.date),
       changefreq: "weekly" as ChangeFrequency,
       priority: 0.7,
     }));

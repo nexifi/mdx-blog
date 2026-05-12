@@ -100,5 +100,77 @@ describe("BlogListSchema", () => {
     expect(script).toBeInTheDocument();
     const data = JSON.parse(script?.textContent || "{}");
     expect(data["@type"]).toBe("CollectionPage");
+    expect(data.mainEntity["@type"]).toBe("Blog");
+  });
+});
+
+describe("ArticleSchema — AI/LLM SEO", () => {
+  it("uses updatedAt for dateModified when provided", () => {
+    const { container } = render(
+      <ArticleSchema
+        article={{ ...mockArticle, updatedAt: "2025-09-01T00:00:00Z" }}
+        config={schemaConfig}
+      />,
+    );
+    const scripts = container.querySelectorAll(
+      'script[type="application/ld+json"]',
+    );
+    const data = JSON.parse(scripts[0]?.textContent || "{}");
+    expect(data.dateModified.startsWith("2025-09-01")).toBe(true);
+    expect(data.datePublished.startsWith("2024-01-15")).toBe(true);
+  });
+
+  it("auto-emits a FAQPage from H2 questions in content", () => {
+    const article = {
+      ...mockArticle,
+      content: `## Qu'est-ce que MDX ?\n\nMDX combine Markdown et JSX pour intégrer des composants React directement dans du texte structuré. C'est devenu un standard pour les blogs techniques modernes car cela combine la simplicité de Markdown avec la puissance de React.\n\n## Conclusion\n\nVoilà.`,
+    };
+    const { container } = render(
+      <ArticleSchema article={article} config={schemaConfig} />,
+    );
+    const scripts = container.querySelectorAll(
+      'script[type="application/ld+json"]',
+    );
+    const faqScript = Array.from(scripts).find((s) => {
+      const data = JSON.parse(s.textContent || "{}");
+      return data["@type"] === "FAQPage";
+    });
+    expect(faqScript).toBeDefined();
+    const data = JSON.parse(faqScript!.textContent || "{}");
+    expect(data.mainEntity[0].name).toBe("Qu'est-ce que MDX ?");
+  });
+
+  it("prefers explicit article.faqs over auto extraction", () => {
+    const article = {
+      ...mockArticle,
+      content: "## Why? \n\nLong text that should be ignored when faqs override.".repeat(10),
+      faqs: [{ question: "Override?", answer: "Yes." }],
+    };
+    const { container } = render(
+      <ArticleSchema article={article} config={schemaConfig} />,
+    );
+    const scripts = container.querySelectorAll(
+      'script[type="application/ld+json"]',
+    );
+    const faqScript = Array.from(scripts).find((s) =>
+      (s.textContent || "").includes('"FAQPage"'),
+    );
+    const data = JSON.parse(faqScript!.textContent || "{}");
+    expect(data.mainEntity[0].name).toBe("Override?");
+  });
+
+  it("does not emit FAQPage when disableAutoFAQ is true and no faqs", () => {
+    const article = {
+      ...mockArticle,
+      content: "## What is it?\n\nA long enough paragraph " + "x ".repeat(40),
+    };
+    const { container } = render(
+      <ArticleSchema
+        article={article}
+        config={{ ...schemaConfig, disableAutoFAQ: true }}
+      />,
+    );
+    const html = container.innerHTML;
+    expect(html).not.toContain('"FAQPage"');
   });
 });

@@ -47,6 +47,12 @@ export interface Labels {
   // Schema
   blogPrefix: string;
   discoverArticles: string;
+
+  // Dates / freshness (AI/LLM SEO)
+  /** Visible prefix for the original publication date (e.g., "Publié le") */
+  publishedOn: string;
+  /** Visible prefix for the last update (e.g., "Mis à jour le") */
+  updatedOn: string;
 }
 
 /**
@@ -97,6 +103,10 @@ export const defaultLabels: Labels = {
   // Schema
   blogPrefix: "Blog",
   discoverArticles: "Découvrez tous nos articles",
+
+  // Dates
+  publishedOn: "Publié le",
+  updatedOn: "Mis à jour le",
 };
 
 /**
