@@ -24,6 +24,19 @@
 
 import { marked, type MarkedOptions } from "marked";
 
+const blankLinksExtension = {
+  useNewRenderer: true,
+  renderer: {
+    link(this: any, token: { href: string; title?: string | null; tokens: any[] }) {
+      const text = this.parser.parseInline(token.tokens);
+      const titleAttr = token.title ? ` title="${token.title}"` : "";
+      return `<a href="${token.href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    },
+  },
+};
+
+marked.use(blankLinksExtension as any);
+
 /**
  * Options for `renderMarkdown`.
  */

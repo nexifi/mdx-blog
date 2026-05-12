@@ -177,6 +177,8 @@ const components: Record<string, React.ComponentType<any>> = {
         <Link
           href={props.href}
           className="text-blue-600 hover:underline font-medium"
+          target="_blank"
+          rel="noopener noreferrer"
           {...props}
         />
       );

@@ -33,6 +33,16 @@ describe("renderMarkdown", () => {
     expect(html).toContain("click");
   });
 
+  it("should open all links in a new tab", async () => {
+    const external = await renderMarkdown("[ext](https://example.com)");
+    expect(external).toContain('target="_blank"');
+    expect(external).toContain('rel="noopener noreferrer"');
+
+    const internal = await renderMarkdown("[home](/about)");
+    expect(internal).toContain('target="_blank"');
+    expect(internal).toContain('rel="noopener noreferrer"');
+  });
+
   it("should handle code blocks", async () => {
     const html = await renderMarkdown("```js\nconst x = 1;\n```");
     expect(html).toContain("<code");
